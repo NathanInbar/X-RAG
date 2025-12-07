@@ -89,21 +89,21 @@
 \newcommand{\affilthree}{$\diamond$}
 
 %
-% Defines the command to inlcude the Canadian AI logo in PNG
+% Defines the command to include the Canadian AI logo in PNG
 %
 \ifpdf
   \typeout{^^J *** PDF(LaTeX) mode *** }
-  \def\caiacLogoCommand{\includegraphics[scale=.2]{figs/canai2025-logo.png}}
+  \def\caiacLogoCommand{\includegraphics[scale=.3]{figs/logo-canai-2026.png}}
 \else
   \typeout{^^J *** DVI mode ***} 
-  \def\caiacLogoCommand{\includegraphics[scale=.2,natwidth=1359,natheight=319]{figs/canai2025-logo.png}}
+  \def\caiacLogoCommand{\includegraphics[scale=.3]{figs/logo-canai-2026.png}}
 \fi
 
 % Header with the logo, to appear in upper left hand corner
 \newcommand{\volumeheader}[2]{%
 \begin{tikzpicture}[remember picture,overlay]
     \node[inner sep=0] (image) at (12,1.85){\caiacLogoCommand};
-        \node at (3.9,2) {The #1th Canadian Conference on Artificial Intelligence};
+        \node at (3.9,2) {The 39th Canadian Conference on Artificial Intelligence};
         \node at (.2,1.5) {DOI: #2}; 
         \node at (6.6, 1.2) {\noindent\makebox[\textwidth]{\rule{\textwidth}{0.3pt}}};
         
