@@ -1,10 +1,10 @@
-from models import Chunk
+from utils.models import Chunk
 
 class ChunkDatabase():
     """
     In-memory database of chunks
     """
-    
+
     def __init__(self):
         self.chunks = dict[int, Chunk]
         self.idx_itr = 0
