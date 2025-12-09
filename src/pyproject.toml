@@ -7,6 +7,7 @@ dependencies = [
     "dspy==3.0.1",
     "openai==1.99.9", # Note: dspy 3.0.1 has a compatibility issue with openai 1.100.0: https://github.com/stanfordnlp/dspy/issues/8677
     "neo4j==5.28.2",
+    "wtpsplit>=2.1.6",
     "scikit-learn"
 ]
 
