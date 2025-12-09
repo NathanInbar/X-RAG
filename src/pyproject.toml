@@ -2,7 +2,12 @@
 name = "x-rag"
 version = "0.1.0"
 requires-python = "==3.12.11"
-dependencies = []
+dependencies = [
+    "pydantic==2.11.7",
+    "dspy==3.0.1",
+    "openai==1.99.9", # Note: dspy 3.0.1 has a compatibility issue with openai 1.100.0: https://github.com/stanfordnlp/dspy/issues/8677
+    "scikit-learn"
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
