@@ -1,0 +1,36 @@
+services:
+
+  memgraph:
+    build:
+      context: ./memgraph
+      dockerfile: Dockerfile
+    container_name: memgraph
+    environment:
+      - 
+    env_file:
+      - 
+    ports:
+      - "7687:7687" # Bolt
+      - "7444:7444" # Memgraph Lab
+    volumes:
+      - mg_data:/var/lib/memgraph
+    command:
+      - "--init_file=/usr/lib/memgraph/constraints_idxs.cypherl"
+    healthcheck:
+      test:: ["CMD-SHELL", "echo 'RETURN 0;' | mgconsole --username dev --password pass || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 0s
+
+  lab:
+    image: memgraph/lab:latest
+    container-name: memgraph-lab
+    depends_on:
+      memgraph:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      - QUICK_CONNECT_MG_HOST=memgraph
+      - QUICK_CONNECT_MG_PORT=7687
