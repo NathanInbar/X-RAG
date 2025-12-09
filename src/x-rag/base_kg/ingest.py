@@ -1,12 +1,7 @@
-import sys
 import asyncio
-
 from pathlib import Path
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
-from utils.models import Chunk
-from utils.db import ChunkDatabase
+from ..utils.models import Chunk
+from ..utils.db import ChunkDatabase
 
 DATASET_DIR = "datasets"
 
