@@ -1,0 +1,3 @@
+//entity uniqueness
+CREATE CONSTRAINT ON (e:Entity) ASSERT e.key IS UNIQUE
+CREATE INDEX ON :Entity(key)
