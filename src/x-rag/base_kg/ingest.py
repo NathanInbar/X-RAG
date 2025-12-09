@@ -1,7 +1,13 @@
 import asyncio
+import sys
+
 from pathlib import Path
-from ..utils.models import Chunk
-from ..utils.db import ChunkDatabase
+ROOT = Path(__file__).resolve().parents[1]
+print(ROOT)
+sys.path.insert(0, str(ROOT))
+
+from utils.models import Chunk
+from utils.db import ChunkDatabase
 
 DATASET_DIR = "datasets"
 
@@ -11,7 +17,7 @@ async def ingest_dataset(dataset_folder_name:str) -> None:
     in memgraph with chunk data in a ChunkDatabase
     """
     base = Path(__file__).resolve()
-    target = base.parents[2] / DATASET_DIR /dataset_folder_name
+    target = base.parents[3] / DATASET_DIR /dataset_folder_name
 
     ingest_tasks = []
     for p in target.iterdir():
