@@ -7,8 +7,18 @@ dependencies = [
     "dspy==3.0.1",
     "openai==1.99.9", # Note: dspy 3.0.1 has a compatibility issue with openai 1.100.0: https://github.com/stanfordnlp/dspy/issues/8677
     "neo4j==5.28.2",
-    "wtpsplit>=2.1.6",
+    "aioboto3==15.1.0",
+    "wtpsplit[onnx-cpu]>=2.1.6",
+    "wtpsplit[onnx-gpu]>=2.1.6",
+    "python-dotenv",
     "scikit-learn"
+]
+
+[project.optional-dependencies]
+utils = [
+    "pymupdf==1.26.3",
+    "pymupdf4llm",
+    "ijson==3.4.0"
 ]
 
 [build-system]
