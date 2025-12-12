@@ -39,10 +39,10 @@ def process(input_folder: str, out_filename: str) -> None:
 
             if not first:
                 out_file.write(",\n")
+            first = False
                 
             json.dump(obj, out_file, ensure_ascii=False)
             out_file.flush()
-            first = False
 
         out_file.write("\n]")
 
@@ -52,10 +52,10 @@ def main() -> None:
         description="Create a JSON dataset from a folder of PDF files."
     )
     parser.add_argument("--input_folder", required=True)
-    parser.add_argument("--out_filename", default="output")
+    parser.add_argument("--output_file", default="output_md.json")
 
     args = parser.parse_args()
-    process(args.input_folder, args.out_filename)
+    process(args.input_folder, args.output_file)
 
 
 if __name__ == "__main__":
