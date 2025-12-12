@@ -9,10 +9,9 @@ from tokenizers import Tokenizer
 
 SEGMENTER_MODEL = "sat-3l-sm"
 PARAGRAPH_THRESHOLD = 0.5 # default = 0.5
+MIN_CHUNK_TOKENS_THRESH = 20
 
-DISPLAY_TOKEN_STATS = True
-if DISPLAY_TOKEN_STATS:
-    _tokenizer = Tokenizer.from_pretrained("gpt2")
+_tokenizer = Tokenizer.from_pretrained("gpt2")
 
 import statistics
 
@@ -90,33 +89,22 @@ def process(input_filename: str, output_filename: str) -> None:
         # top-level JSON is: [ { "source": ..., "text": ... }, ... ]
         for jobj in ijson.items(in_file, "item"):
             try:
-                chunks = TextSegmenter.create_segments(jobj["text"])
-                if not chunks:
+                raw_chunks = TextSegmenter.create_segments(jobj["text"])
+                if not raw_chunks:
                     raise Exception(f"source '{jobj["source"]}' did not generate chunks")
-                out_jobj = {
-                    "source": jobj["source"],
-                    "chunks": chunks,
-                }
 
-                if not first:
-                    out_file.write(",\n")
-                json.dump(out_jobj, out_file, ensure_ascii=False)
-                out_file.flush()
-
-                first = False
-
-            except Exception as e:
-                print(f"Error segmenting pdf '{jobj['source']}': {e}")
-
-
-            if DISPLAY_TOKEN_STATS:
                 token_counts = []
                 min_tokens = float('inf')
                 max_tokens = 0
-
-                for chunk_text in chunks:
+                chunks = []
+                for chunk_text in raw_chunks:
                     enc = _tokenizer.encode(chunk_text)
                     num_tokens = len(enc)
+                    if num_tokens < MIN_CHUNK_TOKENS_THRESH:
+                        # trim small token chunks
+                        continue
+                    chunks.append(chunk_text)
+
                     token_counts.append(num_tokens)
 
                     if(num_tokens < min_tokens):
@@ -131,6 +119,21 @@ def process(input_filename: str, output_filename: str) -> None:
                 print(f"Min chunk token count: {min_tokens}")
                 print(f"Max chunk token count: {max_tokens}")
                 print("=============\n")
+                
+                out_jobj = {
+                    "source": jobj["source"],
+                    "chunks": chunks,
+                }
+
+                if not first:
+                    out_file.write(",\n")
+                json.dump(out_jobj, out_file, ensure_ascii=False)
+                out_file.flush()
+
+                first = False
+
+            except Exception as e:
+                print(f"Error segmenting pdf '{jobj['source']}': {e}")
 
         out_file.write("\n]")
 
