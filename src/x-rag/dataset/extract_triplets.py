@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import dspy
 import json
 import ijson
+import litellm
 
 SRC = Path(__file__).resolve().parents[2]
 
