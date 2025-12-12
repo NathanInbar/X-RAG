@@ -3,14 +3,20 @@ import argparse
 from pathlib import Path
 import json
 
-import fitz
+import fitz, pymupdf4llm
+import re
 
 def extract_text(pdf_path: Path) -> str:
-    text = []
+    
     with fitz.open(pdf_path) as doc:
-        for page in doc:
-            text.append(page.get_text())
-    return "\n".join(text)
+        md_text = pymupdf4llm.to_markdown(doc, ignore_images=True, ignore_graphics=True, ignore_code=True)
+
+        md_text = re.sub(r"(?<!\n)\n(?!\n)", " ", md_text) # a single line break -> 1 whitespace
+        md_text = re.sub(r"\n{2,}", "\n", md_text) # 2+ line breaks -> 1 line break
+        md_text = re.sub(r"\s{2,}", " ", md_text) # 2+ whitespaces -> 1 whitespace
+        md_text = re.sub(r"\n^[0-9]$\n", " ", md_text, flags=re.MULTILINE) # any lines that are just a single digit (figure breaks)
+    
+    return md_text
 
 
 def process(input_folder: str, out_filename: str) -> None:
@@ -33,6 +39,7 @@ def process(input_folder: str, out_filename: str) -> None:
 
             if not first:
                 out_file.write(",\n")
+                
             json.dump(obj, out_file, ensure_ascii=False)
             out_file.flush()
             first = False
