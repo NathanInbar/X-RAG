@@ -3,16 +3,6 @@
         "source": "177-21747604608613.pdf",
         "chunks": [
             {
-                "chunk_text": "The 38th Canadian Conference on Artificial Intelligence",
-                "triplets": [
-                    {
-                        "subject": "38th Canadian Conference on Artificial Intelligence",
-                        "predicate": "is",
-                        "object": "conference"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "# **Detecting Aimbot Usage in Minecraft Using a Long Short-Term** **Memory Model**",
                 "triplets": [
                     {
@@ -24,31 +14,6 @@
                         "subject": "Detecting Aimbot Usage",
                         "predicate": "using",
                         "object": "a Long Short-Term Memory Model"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "James Vandersluis [†,*], Alexander Wong [†] - University of Waterloo",
-                "triplets": [
-                    {
-                        "subject": "James Vandersluis",
-                        "predicate": "affiliation",
-                        "object": "University of Waterloo"
-                    },
-                    {
-                        "subject": "Alexander Wong",
-                        "predicate": "affiliation",
-                        "object": "University of Waterloo"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Abstract**",
-                "triplets": [
-                    {
-                        "subject": "Abstract",
-                        "predicate": "contains",
-                        "object": "content"
                     }
                 ]
             },
@@ -193,16 +158,6 @@
                 ]
             },
             {
-                "chunk_text": "1. **Introduction**",
-                "triplets": [
-                    {
-                        "subject": "Introduction",
-                        "predicate": "is",
-                        "object": "section 1"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "Historically the video game industry has stayed at the cutting edge of technology, sometimes at the cost of implementing proper security features [1]. This gives many would-be hackers an easier time when trying to find exploits in games. This is a smaller problem in single player games since the exploits would not affect other players directly. However, in the online gaming sphere the poor security of a game may allow hackers to leverage exploits to their own advantage. Though there are a wide range of exploit categories, one of particular interest is cheating through misplaced trust. This is the act of tampering on the client-side with the game code, configuration data, or both, allowing one to take advantage of the trust put in the client [2]. A cheater can tamper with their client’s game states directly in a way that would not otherwise be possible for players [2]. A specific example of this kind of exploit would be the automatic aiming robot, also known as an aimbot. Aimbots use the internal game state of the client to lock the player’s camera perfectly onto the target without any human intervention. This specific form of exploitation is seen often in first-person combat games, where the accuracy of one’s mouse movements and click timings is critical. One such video game that suffers from this form of cheating is Minecraft. Minecraft is an incredibly popular game, having been purchased over 300 million times [3]. In the game of Minecraft, players control a character from a first-person perspective in a voxel based world. The game consists of a",
                 "triplets": [
                     {
@@ -289,16 +244,6 @@
                         "subject": "the game of Minecraft",
                         "predicate": "consists of",
                         "object": "a"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "- james.vandersluis@uwaterloo.ca",
-                "triplets": [
-                    {
-                        "subject": "james.vandersluis@uwaterloo.ca",
-                        "predicate": "is",
-                        "object": "email"
                     }
                 ]
             },
@@ -578,16 +523,6 @@
                 ]
             },
             {
-                "chunk_text": "2.1. **Statistical Approaches**",
-                "triplets": [
-                    {
-                        "subject": "Statistical Approaches",
-                        "predicate": "is",
-                        "object": "a section"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "Though neural networks are a good choice for a pattern recognition task like aimbot detection, there are other methods that rely on more statistical measures. One such paper explored the use of two dissimilarity metrics to distinguish whether a player’s movement trajectory was indicative of a bot or a human [7]. Their approach involved computing the dissimilarity metric, applying an isomap to the data, and then using a classification algorithm that could identify the clusters such as k-NN or smooth SVM [7]. Their game of choice was Quake 2, a first-person shooter game that had a large amount of player aiming data available [7]. With this dataset they accomplished an accuracy score of 98% and higher",
                 "triplets": [
                     {
@@ -679,16 +614,6 @@
                         "subject": "The software",
                         "predicate": "detected",
                         "object": "7 out of 8 aimbotters in CS:GO"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "2.2. **Deep Learning Approaches**",
-                "triplets": [
-                    {
-                        "subject": "Deep Learning Approaches",
-                        "predicate": "is",
-                        "object": "a section"
                     }
                 ]
             },
@@ -864,26 +789,6 @@
                         "subject": "game state information",
                         "predicate": "is discussed further in",
                         "object": "Section 5.2"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "3. **Methodology**",
-                "triplets": [
-                    {
-                        "subject": "Methodology",
-                        "predicate": "is",
-                        "object": "section of the document"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "3.1. **Dataset Preparation**",
-                "triplets": [
-                    {
-                        "subject": "Dataset Preparation",
-                        "predicate": "is",
-                        "object": "section 3.1"
                     }
                 ]
             },
@@ -1093,16 +998,6 @@
                 ]
             },
             {
-                "chunk_text": "3.2. **Network Architecture**",
-                "triplets": [
-                    {
-                        "subject": "Network Architecture",
-                        "predicate": "is",
-                        "object": "a section"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "It is evident that by the nature of this problem being a time series, that some form of RNN was most applicable. We weighed the possible available options by consulting literature to explore approaches to similar problems. Common networks for time series data were Long Short-Term Memory and Gated Recurrent Unit networks as shown in Section 2. LSTM is a type of recurrent neural network that gives a solution to the vanishing/exploding gradient problem seen in traditional RNNs [13]. LSTM is known to be effective at capturing longterm temporal dependencies [14]. Further, they are very generalized and can handle many kinds of problems [14]. Gated Recurrent Unit networks are similar to LSTMs, however, they omit the output gate that controls the level to which its memory is exposed, and thus exposes the full state at each time step [15]. From empirical results in one study, it was not possible to determine whether LSTM or GRU was inherently a better kind of recurrent network [15]. Rather, it appeared as though the choice of which network performs better depends on the dataset [15]. Transformers were also not considered, since they are generally less suited towards time series data, especially when the series are long-term, as shown in a study where the authors compared Transformer models to LSTM models in a stock price time series task [16]. We hypothesized that an LSTM network would be best suited for the detection of aimbotting on our dataset’s features since the sequences are reasonably long and would thus benefit from the use of the output gate. To test our hypothesis we explored the use of both our own proposed LSTM network and a bidirectional GRU based network proposed in [6]. We slightly modified the model in [6] by switching the loss metric to binary cross entropy loss opposed to their use of mean squared error. This was done to support our desired binary outputs from the model. It follows therefore, that we also added a sigmoid activation on the output of the model. For the GRU based model we used all the other hyper-parameters detailed in [6], being, a 3 layer bidirectional GRU with 10% dropout, 64 hidden units per layer, and batch sizes of 64. Our proposed network architecture shown in Figure 2 consists of a four-layered LSTM block followed by a fully connected layer that connects the hidden states in the final layer of the LSTM to a single output neuron. For the first three layers of the LSTM we applied 30% dropout to help improve regularization of the network. We applied the sigmoid function to bind our output to (0, 1), effectively giving us a probability of whether the input data is an aimbot or not. The input to the network is a sequence of 35 consecutive movement samples from the player where each sample consists of 12 features, being: `yaw`, `pitch`, `delta_yaw`, `delta_pitch`, `accel_yaw`, `accel_pitch`, `target_x`, `target_y`, `target_z`, `position_x`, `position_y`, and `position_z` . During training, validation, and testing we used batch sizes of 128.",
                 "triplets": [
                     {
@@ -1223,16 +1118,6 @@
                 ]
             },
             {
-                "chunk_text": "3.3. **Evaluation Metric**",
-                "triplets": [
-                    {
-                        "subject": "Evaluation Metric",
-                        "predicate": "is",
-                        "object": "3.3"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "To evaluate both models’ performance we split our dataset into an 80/10/10 train, validation, and test set, where all data is shuffled prior to splitting to reduce correlation between _Figure 2._ Our proposed architecture consisting of 4 LSTM layers with 30% dropout, a fully connected layer, and a sigmoid output neuron.",
                 "triplets": [
                     {
@@ -1313,10 +1198,6 @@
                 ]
             },
             {
-                "chunk_text": "_TotalNumberOfSamples_",
-                "triplets": []
-            },
-            {
                 "chunk_text": "Where TruePositives are the number of samples correctly identified as aimbotting, and TrueNegatives are the number of samples correctly identified as non-aimbotting behaviour. Accuracy is a metric that evaluates which proportion of samples were identified correctly. For both binary classifier models, this is a meaningful metric as the output is either true or false with respect to whether the movement is indicative of aimbotting or not. Further, we care about accuracy being high, as false positives or false negatives means either a player is being flagged and potentially punished for an offense they did not commit, or the player committing the offense is not being caught at all. Thus, it is critical for the model to be usable in real-world applications in which the promotion of fairness is key, that it be able to maintain a high accuracy. To better understand the confidence of the model, we used seven accuracy threshold values that determine at which confidence level the model classifies the prediction as a true positive. These seven values are: 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, and 0.99. Where a high threshold represents a higher level of confidence required to classify the sample as aimbotting.",
                 "triplets": [
                     {
@@ -1362,16 +1243,6 @@
                 ]
             },
             {
-                "chunk_text": "3.4. **Training Strategy and Fine-Tuning**",
-                "triplets": [
-                    {
-                        "subject": "Training Strategy and Fine-Tuning",
-                        "predicate": "is",
-                        "object": "section 3.4"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "We implemented and trained two architectures for our study. We first trained the bidirectional GRU based network as described in Section 3.2 using the hyper-parameters as discussed. No further hyper-parameter exploration was done for this model. _Table 1._ The range of hyper-parameters that we manually searched along with the parameters in our search that yielded the best results for our LSTM model.",
                 "triplets": [
                     {
@@ -1408,76 +1279,6 @@
                         "subject": "The range of hyper-parameters",
                         "predicate": "was manually searched",
                         "object": "along with the parameters in our search that yielded the best results for our LSTM model"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Parameter Range Best",
-                "triplets": [
-                    {
-                        "subject": "Parameter Range",
-                        "predicate": "is",
-                        "object": "Best"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Sequence Length 25 - 45 35",
-                "triplets": [
-                    {
-                        "subject": "Sequence Length",
-                        "predicate": "range",
-                        "object": "25 to 45"
-                    },
-                    {
-                        "subject": "Sequence Length",
-                        "predicate": "specific value",
-                        "object": "35"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Hidden Units 75-300 200",
-                "triplets": [
-                    {
-                        "subject": "Hidden Units",
-                        "predicate": "range",
-                        "object": "75-300"
-                    },
-                    {
-                        "subject": "Hidden Units",
-                        "predicate": "default",
-                        "object": "200"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Number of Layers 1-4 4",
-                "triplets": [
-                    {
-                        "subject": "Number of Layers",
-                        "predicate": "is",
-                        "object": "1-4"
-                    },
-                    {
-                        "subject": "Number of Layers",
-                        "predicate": "is",
-                        "object": "4"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Dropout Percentage 0.25 - 0.5 0.3",
-                "triplets": [
-                    {
-                        "subject": "Dropout Percentage",
-                        "predicate": "range",
-                        "object": "0.25 - 0.5"
-                    },
-                    {
-                        "subject": "Dropout Percentage",
-                        "predicate": "value",
-                        "object": "0.3"
                     }
                 ]
             },
@@ -1562,16 +1363,6 @@
                 ]
             },
             {
-                "chunk_text": "4. **Experimental Results**",
-                "triplets": [
-                    {
-                        "subject": "Experimental Results",
-                        "predicate": "is",
-                        "object": "section 4"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "_Table 2._ Classification accuracies for the test set using seven different confidence thresholds on the LSTM and GRU network, respectively.",
                 "triplets": [
                     {
@@ -1598,281 +1389,6 @@
                         "subject": "seven different confidence thresholds",
                         "predicate": "are used on",
                         "object": "the LSTM and GRU network"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "LSTM Bidirectional GRU",
-                "triplets": [
-                    {
-                        "subject": "LSTM",
-                        "predicate": "is",
-                        "object": "Bidirectional GRU"
-                    },
-                    {
-                        "subject": "Bidirectional GRU",
-                        "predicate": "is",
-                        "object": "LSTM"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Confidence Level Correct Incorrect Accuracy Correct Incorrect Accuracy",
-                "triplets": [
-                    {
-                        "subject": "Confidence Level",
-                        "predicate": "has_categories",
-                        "object": "Correct, Incorrect"
-                    },
-                    {
-                        "subject": "Accuracy",
-                        "predicate": "has_categories",
-                        "object": "Correct, Incorrect"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.50 33535 394 98.8% 33283 646 98.1%",
-                "triplets": [
-                    {
-                        "subject": "0.50",
-                        "predicate": "is",
-                        "object": "33535"
-                    },
-                    {
-                        "subject": "33535",
-                        "predicate": "has",
-                        "object": "394"
-                    },
-                    {
-                        "subject": "394",
-                        "predicate": "is",
-                        "object": "98.8%"
-                    },
-                    {
-                        "subject": "33283",
-                        "predicate": "is",
-                        "object": "646"
-                    },
-                    {
-                        "subject": "646",
-                        "predicate": "is",
-                        "object": "98.1%"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.60 33534 395 98.8% 33288 641 98.1%",
-                "triplets": [
-                    {
-                        "subject": "0.60",
-                        "predicate": "is",
-                        "object": "33534"
-                    },
-                    {
-                        "subject": "33534",
-                        "predicate": "has",
-                        "object": "395"
-                    },
-                    {
-                        "subject": "395",
-                        "predicate": "is",
-                        "object": "98.8%"
-                    },
-                    {
-                        "subject": "98.8%",
-                        "predicate": "is",
-                        "object": "33288"
-                    },
-                    {
-                        "subject": "33288",
-                        "predicate": "has",
-                        "object": "641"
-                    },
-                    {
-                        "subject": "641",
-                        "predicate": "is",
-                        "object": "98.1%"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.70 33517 412 98.8% 33244 685 98.0%",
-                "triplets": [
-                    {
-                        "subject": "0.70",
-                        "predicate": "is",
-                        "object": "33517"
-                    },
-                    {
-                        "subject": "33517",
-                        "predicate": "has",
-                        "object": "412"
-                    },
-                    {
-                        "subject": "412",
-                        "predicate": "is",
-                        "object": "98.8%"
-                    },
-                    {
-                        "subject": "98.8%",
-                        "predicate": "is",
-                        "object": "33244"
-                    },
-                    {
-                        "subject": "33244",
-                        "predicate": "has",
-                        "object": "685"
-                    },
-                    {
-                        "subject": "685",
-                        "predicate": "is",
-                        "object": "98.0%"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.80 33507 422 98.8% 33200 729 97.9%",
-                "triplets": [
-                    {
-                        "subject": "0.80",
-                        "predicate": "is",
-                        "object": "33507"
-                    },
-                    {
-                        "subject": "33507",
-                        "predicate": "has",
-                        "object": "422"
-                    },
-                    {
-                        "subject": "422",
-                        "predicate": "has",
-                        "object": "98.8%"
-                    },
-                    {
-                        "subject": "98.8%",
-                        "predicate": "is",
-                        "object": "33200"
-                    },
-                    {
-                        "subject": "33200",
-                        "predicate": "has",
-                        "object": "729"
-                    },
-                    {
-                        "subject": "729",
-                        "predicate": "has",
-                        "object": "97.9%"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.90 33462 467 98.6% 33033 896 97.4%",
-                "triplets": [
-                    {
-                        "subject": "0.90",
-                        "predicate": "is",
-                        "object": "percentage"
-                    },
-                    {
-                        "subject": "33462",
-                        "predicate": "is",
-                        "object": "number"
-                    },
-                    {
-                        "subject": "467",
-                        "predicate": "is",
-                        "object": "number"
-                    },
-                    {
-                        "subject": "98.6%",
-                        "predicate": "is",
-                        "object": "percentage"
-                    },
-                    {
-                        "subject": "33033",
-                        "predicate": "is",
-                        "object": "number"
-                    },
-                    {
-                        "subject": "896",
-                        "predicate": "is",
-                        "object": "number"
-                    },
-                    {
-                        "subject": "97.4%",
-                        "predicate": "is",
-                        "object": "percentage"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.95 33404 525 98.5% 32782 1147 96.6%",
-                "triplets": [
-                    {
-                        "subject": "0.95",
-                        "predicate": "is",
-                        "object": "33404"
-                    },
-                    {
-                        "subject": "33404",
-                        "predicate": "has",
-                        "object": "525"
-                    },
-                    {
-                        "subject": "98.5%",
-                        "predicate": "is",
-                        "object": "32782"
-                    },
-                    {
-                        "subject": "32782",
-                        "predicate": "has",
-                        "object": "1147"
-                    },
-                    {
-                        "subject": "96.6%",
-                        "predicate": "is",
-                        "object": "not explicitly mentioned"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "0.99 33122 807 97.6% 32048 1881 94.5%",
-                "triplets": [
-                    {
-                        "subject": "0.99",
-                        "predicate": "is",
-                        "object": "percentage"
-                    },
-                    {
-                        "subject": "33122",
-                        "predicate": "is",
-                        "object": "total"
-                    },
-                    {
-                        "subject": "807",
-                        "predicate": "is",
-                        "object": "number of items"
-                    },
-                    {
-                        "subject": "97.6%",
-                        "predicate": "is",
-                        "object": "percentage"
-                    },
-                    {
-                        "subject": "32048",
-                        "predicate": "is",
-                        "object": "total"
-                    },
-                    {
-                        "subject": "1881",
-                        "predicate": "is",
-                        "object": "number of items"
-                    },
-                    {
-                        "subject": "94.5%",
-                        "predicate": "is",
-                        "object": "percentage"
                     }
                 ]
             },
@@ -1992,26 +1508,6 @@
                 ]
             },
             {
-                "chunk_text": "5. **Practical Viability**",
-                "triplets": [
-                    {
-                        "subject": "Practical Viability",
-                        "predicate": "is",
-                        "object": "a section"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "5.1. **Inference Speed**",
-                "triplets": [
-                    {
-                        "subject": "Inference Speed",
-                        "predicate": "is",
-                        "object": "a critical factor in real-time applications"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "Our lab computer setup used an NVIDIA GeForce 1660Ti with 6GB of VRAM, a Ryzen7 2700X Eight-Core CPU, and 47GB of DDR4 RAM. With respect to our proposed LSTM network, we were able to achieve average inference speeds of 8.04 milliseconds per sample over ten samples on the GPU where the GPU was given one warm-up sample prior to taking the average. We further achieved an average inference speed of 131.74 milliseconds per sample over ten samples on the CPU. These speeds are reasonable but problematic with respect to real-time monitoring as the server resources required to perform continual inference at these speeds on a large player base would be immense. However, the speeds are low enough to use this model periodically. Some recommendations of areas where this model could be applied assuming the server captures and stores periodic or rolling movement samples of the correct inference sequence length:",
                 "triplets": [
                     {
@@ -2067,36 +1563,6 @@
                 ]
             },
             {
-                "chunk_text": "_•_ Upon a weak real time statistic flagging a player as suspicious.",
-                "triplets": [
-                    {
-                        "subject": "real time statistic",
-                        "predicate": "flag",
-                        "object": "player"
-                    },
-                    {
-                        "subject": "player",
-                        "predicate": "be",
-                        "object": "suspicious"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "_•_ Upon receiving a manual user report for cheating.",
-                "triplets": [
-                    {
-                        "subject": "user",
-                        "predicate": "reports",
-                        "object": "cheating"
-                    },
-                    {
-                        "subject": "report",
-                        "predicate": "is",
-                        "object": "manual"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "_•_ Upon a player winning a game, a sample of their movement data from the game is analyzed.",
                 "triplets": [
                     {
@@ -2113,26 +1579,6 @@
                         "subject": "a sample of their movement data from the game",
                         "predicate": "is",
                         "object": "analyzed"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "_•_ Upon a player killing another player in game.",
-                "triplets": [
-                    {
-                        "subject": "player",
-                        "predicate": "kills",
-                        "object": "another player"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "5.2. **Framework Integration**",
-                "triplets": [
-                    {
-                        "subject": "Framework Integration",
-                        "predicate": "is",
-                        "object": "section 5.2"
                     }
                 ]
             },
@@ -2207,16 +1653,6 @@
                 ]
             },
             {
-                "chunk_text": "6. **Conclusion**",
-                "triplets": [
-                    {
-                        "subject": "Conclusion",
-                        "predicate": "is",
-                        "object": "section 6"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "This paper explored the growing issue of online cheating and its effects on game servers. We specifically turned our focus to aimbotting, which plagues first-person style games, where some form of combat and competition is involved. We identified a gap in any literature addressing the server-side detection of Minecraft aimbotting. We provided a background on aimbot detection techniques attempted by other authors in other online games. After some discussion on viable networks, we landed on the popular recurrent neural network architecture Long Short-Term Memory to provide a solution via classification on user movement time series data, hypothesizing that this network would outperform similar variants. Of particular interest was the bidirectional GRU network used in [6], where the authors saw strong performance on their specific dataset. We used the bidirectional GRU network on our dataset to provide our LSTM model a comparison to current literature. We identified that an aimbot detector would require very high confidence in its predictions in order to be considered fair and viable in real-world deployments. Our network provides noticeable improvements in accuracy at the required high confidence level, which provides both server",
                 "triplets": [
                     {
@@ -2270,10 +1706,6 @@
                         "object": "noticeable improvements in accuracy at the required high confidence level"
                     }
                 ]
-            },
-            {
-                "chunk_text": "10",
-                "triplets": []
             },
             {
                 "chunk_text": "operators and players reassurance that the network is unlikely to falsely flag players for cheating. The LSTM outperformed the bidirectional GRU as shown in Table 2, with 98.5% accuracy at 95% confidence and 97.6% accuracy at 99% confidence. Further, we obtain better performance than other authors attempts at using an LSTM to detect aimbotting, although they used a different dataset [9, 10]. Lastly, we briefly explored the feasibility of this network being deployed in a real server scenario and concluded that this is possible as the accuracy is high enough to be considered reliable, feature data is collectible, and the network inference speed is reasonable.",
@@ -2331,26 +1763,6 @@
                 ]
             },
             {
-                "chunk_text": "7. **Future Works**",
-                "triplets": [
-                    {
-                        "subject": "Future Works",
-                        "predicate": "is",
-                        "object": "section 7"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "7.1. **Wider Hyper-parameter Search**",
-                "triplets": [
-                    {
-                        "subject": "7.1",
-                        "predicate": "is_about",
-                        "object": "Wider Hyper-parameter Search"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "We only explored a limited range of hyper-parameters for the LSTM model. We believe there may be some merit to exploring other ranges of hyper-parameters especially with respect to larger sequence lengths. Though we were unable to achieve convergence at longer sequence lengths, there may be a better set of hyper-parameters that make this feasible.",
                 "triplets": [
                     {
@@ -2376,16 +1788,6 @@
                 ]
             },
             {
-                "chunk_text": "7.2. **Developing Server-side Integration**",
-                "triplets": [
-                    {
-                        "subject": "7.2",
-                        "predicate": "section",
-                        "object": "Developing Server-side Integration"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "For the purposes of this paper we identified the feasibility of using this method on a live server. However, we did not attempt any real implementation of a plugin for some server to test our methods in the wild. We believe this may pose an interesting research topic with respect to monitoring real-time cheating.",
                 "triplets": [
                     {
@@ -2402,16 +1804,6 @@
                         "subject": "we",
                         "predicate": "believe",
                         "object": "this may pose an interesting research topic with respect to monitoring real-time cheating"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Software and Data**",
-                "triplets": [
-                    {
-                        "subject": "Software and Data",
-                        "predicate": "is",
-                        "object": "a category"
                     }
                 ]
             },
@@ -2436,21 +1828,6 @@
                 ]
             },
             {
-                "chunk_text": "**Impact Statement**",
-                "triplets": [
-                    {
-                        "subject": "Impact Statement",
-                        "predicate": "is",
-                        "object": "a section"
-                    },
-                    {
-                        "subject": "Impact Statement",
-                        "predicate": "requires",
-                        "object": "a response"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "This paper presents work whose goal is to advance the field of Machine Learning. Any model whose goal is to flag suspicious behaviour for the purposes of punishing the offender should be scrutinized before being used in a live scenario. As such we advise caution when applying the methods discussed in this paper.",
                 "triplets": [
                     {
@@ -2467,16 +1844,6 @@
                         "subject": "We",
                         "predicate": "advise caution",
                         "object": "when applying the methods discussed in this paper"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**References**",
-                "triplets": [
-                    {
-                        "subject": "References",
-                        "predicate": "is",
-                        "object": "a section"
                     }
                 ]
             },
@@ -2639,10 +2006,6 @@
                         "object": "09/01/2024"
                     }
                 ]
-            },
-            {
-                "chunk_text": "11",
-                "triplets": []
             },
             {
                 "chunk_text": "[6] M. Choi, G. Ko, and S. K. Cha. “BotScreen: Trust Everybody, but Cut the Aimbots Yourself”. In: _32nd USENIX Security Symposium (USENIX Security 23)_ . Anaheim, CA: USENIX Association, Aug. 2023, pp. 481–498. isbn: 978-1-939133-37-3. url: `[https://www.usenix.](https://www.usenix.org/conference/usenixsecurity23/presentation/choi)` `[org/conference/usenixsecurity23/presentation/choi](https://www.usenix.org/conference/usenixsecurity23/presentation/choi)` .",
@@ -3215,16 +2578,6 @@
         "source": "184-11747605107744.pdf",
         "chunks": [
             {
-                "chunk_text": "The 38th Canadian Conference on Artificial Intelligence",
-                "triplets": [
-                    {
-                        "subject": "38th Canadian Conference on Artificial Intelligence",
-                        "predicate": "is",
-                        "object": "conference"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "# **Contextual Attention-Based Multimodal Fusion of LLM and** **CNN for Sentiment Analysis**",
                 "triplets": [
                     {
@@ -3236,16 +2589,6 @@
                         "subject": "Contextual Attention-Based Multimodal Fusion",
                         "predicate": "used for",
                         "object": "Sentiment Analysis"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Abstract**",
-                "triplets": [
-                    {
-                        "subject": "Abstract",
-                        "predicate": "contains",
-                        "object": "content"
                     }
                 ]
             },
@@ -3326,31 +2669,6 @@
                         "subject": "Contextual Attention Mechanism",
                         "predicate": "is a component of",
                         "object": "Multimodal Sentiment Analysis (MSA)"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "CNN, LLM.",
-                "triplets": [
-                    {
-                        "subject": "CNN",
-                        "predicate": "is",
-                        "object": "a news network"
-                    },
-                    {
-                        "subject": "LLM",
-                        "predicate": "stands for",
-                        "object": "Large Language Model"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "1. **Introduction**",
-                "triplets": [
-                    {
-                        "subject": "Introduction",
-                        "predicate": "is",
-                        "object": "section 1"
                     }
                 ]
             },
@@ -3540,16 +2858,6 @@
                 ]
             },
             {
-                "chunk_text": "2. **Related work**",
-                "triplets": [
-                    {
-                        "subject": "Related work",
-                        "predicate": "is",
-                        "object": "section 2"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "Sentiment analysis and emotion recognition are emerging trends in social media analysis. They provide valuable insights into the behavior, preferences, and content of social media users [6, 7]. Although much of the previous research has concentrated on text-based sentiment analysis using data from tweets, text sentiment analysis has changed significantly over time. It has transitioned from conventional rule-based techniques to sophisticated machine learning, deep learning techniques, and pre-trained language models [1]. Exploring sentiment analysis through images has also made significant advances, evolving from fundamental techniques based on basic image attributes to advanced deep learning approaches that integrate complex visual data. However, integrating text with images for sentiment analysis poses a complex challenge. Yue et al. [8] introduced a model that combines the strengths of CNNs for feature extraction with the capacity of Bi-LSTMs to understand the bidirectional contextual dependencies in text, especially in short text sequences. Their findings indicated that such combined models have superior performance compared to neural networks with a singular architecture when analyzing brief texts. Their results demonstrated that hybrid network models outperformed single-structure neural networks in the context of short texts. Abavisani et al. [9] introduced a multimodal sentiment analysis method using Bidirectional Encoder Representations from Transformers (BERT) to capture long-distance dependencies in text. This approach highlighted the importance of viewing image captioning as a multistep cognitive process rather than a simple translation task. Wang et al. [10] proposed Multimodal Sentiment Analysis Representations Learning via Contrastive Learning with Condense Attention Fusion. This work made a pivotal move towards using supervised contrastive learning in multimodal sentiment analysis. Proposing the MLFC module showcased an innovative approach to managing redundant information across modalities, which is a recurrent challenge in the field. Kumar et al. et al. [11] introduced a method combining text and image data from Twitter to identify content relevant to disaster response. The approach leverages a Long Short-Term Memory (LSTM) network and a VGG-16 network to process the multimodal data, leading to a notable performance improvement. Ofli et al. [12] introduced a deep learning approach that combines VGG16 for image processing and a mix of word2vec and CNN for text analysis into a shared feature space, leading to a unified classification via a feedforward neural network. This multimodal method notably enhances disaster-related information analysis on social media, yielding a 78.4% accuracy and outperforming single-modality models. Yang et al. [13] proposed the Multimodal Variational Autoencoder Network (MVAN), a multimodal sentiment analysis method that utilizes memory network modules and multiview attention mechanisms to iteratively extract semantic features from both images and text. While effective, MVAN primarily focuses on feature extraction but does not account for the dynamic interactions between modalities. Shetty et al. [14] introduced a middle fusion paradigm combining cross-modal attention and self-attention to integrate textual and visual features for disaster-related event detection. The approach outperformed early and late fusion methods, achieving superior accuracy in informativeness and disaster type classification on the CrisisMMD dataset, with a 2% improvement over prior multimodal techniques. The aforementioned approaches present certain drawbacks related to intermodal and intramodal relationships and feature prioritization: Understanding the context is challenging because existing models examine text and image modalities separately without considering the context in which they occur. Current multimodal sentiment analysis methods have various drawbacks. They often rely on essential fusion techniques like concatenation because they struggle to handle long-distance relationships in text sequences and effectively fuse text and image modalities. Furthermore, these models have difficulty determining and prioritizing the most relevant features from each modality for sentiment analysis. Our approach overcomes these limitations through the following methodology: - Understanding Intermodal and Intramodal Relationships where our model delves into deciphering the complex relationships between different modalities (intermodal) and within the same modality (intramodal). - GPT’s ability to process long-range dependencies, combined with prompt engineering, enhances contextual understanding for more precise feature extraction. By combining the strengths of CNNs and LLMs, key sentiment features are prioritized, leading to improved sentiment prediction. Ensuring effective multimodal fusion enables the capture of complex interactions between text and image modalities. By addressing these challenges, our framework significantly enhances the depth, accuracy, and interpretability of multimodal sentiment analysis, ensuring a comprehensive understanding of features and their complex interconnections.",
                 "triplets": [
                     {
@@ -3635,16 +2943,6 @@
                 ]
             },
             {
-                "chunk_text": "3. **Proposed Approach**",
-                "triplets": [
-                    {
-                        "subject": "Proposed Approach",
-                        "predicate": "is",
-                        "object": "section 3"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "The goal of multimodal data fusion for sentiment analysis is to identify the strength of emotions expressed in a tweet by analyzing multiple modalities. Our multimodal sentiment analysis model integrates textual, visual, and contextual attention data to predict sentiments. The core equation of our model is described as follows:",
                 "triplets": [
                     {
@@ -3683,10 +2981,6 @@
                         "object": "_X, Y, C_"
                     }
                 ]
-            },
-            {
-                "chunk_text": "where:",
-                "triplets": []
             },
             {
                 "chunk_text": "_•_ ˆ _s_ represents the predicted sentiment, which can be a definite value (positive, negative or neutral).",
@@ -3864,21 +3158,6 @@
                 ]
             },
             {
-                "chunk_text": "3.1. **Intra-Modal Discriminative Feature Extraction**",
-                "triplets": [
-                    {
-                        "subject": "Intra-Modal Discriminative Feature Extraction",
-                        "predicate": "is",
-                        "object": "a process"
-                    },
-                    {
-                        "subject": "Intra-Modal Discriminative Feature Extraction",
-                        "predicate": "aims at",
-                        "object": "extracting features that are discriminative within a single modality"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "Intra-modal discriminative feature extraction isolates and enhances meaningful features within each modality (text or image) independently, preserving their integrity before intermodal integration or analysis.",
                 "triplets": [
                     {
@@ -3910,16 +3189,6 @@
                         "subject": "integrity",
                         "predicate": "is before",
                         "object": "intermodal integration or analysis"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "3.1.1. **Text Feature Extraction**",
-                "triplets": [
-                    {
-                        "subject": "3.1.1.",
-                        "predicate": "is_about",
-                        "object": "Text Feature Extraction"
                     }
                 ]
             },
@@ -4144,16 +3413,6 @@
                 ]
             },
             {
-                "chunk_text": "3.1.2. **Image feature extraction**",
-                "triplets": [
-                    {
-                        "subject": "3.1.2",
-                        "predicate": "is_about",
-                        "object": "Image feature extraction"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "ResNet50’s architecture, known for its deep residual learning, enables the efficient training of deeper networks. Its skip connections, or shortcuts, allow the network to bypass specific layers, effectively addressing the vanishing gradient problem that often occurs in deep networks. Initialize a ResNet50 model with a specified number of output classes and without pretrained weights. Mathematically, the CNN is a function C that maps an input image _Q_ to a prediction vector ˆ _y_ : C : _Q →_ _y_ ˆ (3.5)",
                 "triplets": [
                     {
@@ -4240,16 +3499,6 @@
                         "subject": "feature vector",
                         "predicate": "is incorporated into",
                         "object": "the multimodal interaction layer"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "3.2. **Inter-Modal Integration with Contextual Attention**",
-                "triplets": [
-                    {
-                        "subject": "Inter-Modal Integration",
-                        "predicate": "has",
-                        "object": "Contextual Attention"
                     }
                 ]
             },
@@ -4514,20 +3763,6 @@
                 ]
             },
             {
-                "chunk_text": "1 min _g,h_ _N_",
-                "triplets": [
-                    {
-                        "subject": "1 min",
-                        "predicate": "is",
-                        "object": "_g,h_ _N_"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "_N_",
-                "triplets": []
-            },
-            {
                 "chunk_text": "� _L_ ( _h_ ( _g_ ( **x** [(] _[i]_ [)] )) _, y_ [(] _[i]_ [)] ) (3.10)",
                 "triplets": [
                     {
@@ -4554,16 +3789,6 @@
                         "subject": "y[(i)]",
                         "predicate": "is",
                         "object": "y[(i)]"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "_i_ =1",
-                "triplets": [
-                    {
-                        "subject": "_i_",
-                        "predicate": "equals",
-                        "object": "1"
                     }
                 ]
             },
@@ -4639,26 +3864,6 @@
                         "subject": "context-aware fusion process",
                         "predicate": "leads to",
                         "object": "more accurate and robust sentiment classification"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "4. **Experiments Result and Discussion**",
-                "triplets": [
-                    {
-                        "subject": "Experiments Result and Discussion",
-                        "predicate": "is",
-                        "object": "section"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "4.1. **Dataset**",
-                "triplets": [
-                    {
-                        "subject": "4.1",
-                        "predicate": "section",
-                        "object": "Dataset"
                     }
                 ]
             },
@@ -4743,16 +3948,6 @@
                 ]
             },
             {
-                "chunk_text": "4.2.1. **Parameter Tuning**",
-                "triplets": [
-                    {
-                        "subject": "Parameter Tuning",
-                        "predicate": "is",
-                        "object": "a section"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "During the experiments, we explored how different learning rates and batch sizes impacted the model’s performance. The batch sizes used were 32 and 64, while the learning rates tested were 0.05, 0.01, 0.005, and 0.001. The final model was constructed using the parameters that provided the best results. Table 1 presents the final parameter configurations for our proposed approach:",
                 "triplets": [
                     {
@@ -4779,106 +3974,6 @@
                         "subject": "Table 1",
                         "predicate": "presents",
                         "object": "the final parameter configurations for our proposed approach"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "_Table 1._ Experimental Parameter Settings",
-                "triplets": [
-                    {
-                        "subject": "Table 1",
-                        "predicate": "is",
-                        "object": "Experimental Parameter Settings"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Parameters** **Values**",
-                "triplets": [
-                    {
-                        "subject": "Parameters",
-                        "predicate": "are",
-                        "object": "Values"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "GPT unit 30",
-                "triplets": [
-                    {
-                        "subject": "GPT unit",
-                        "predicate": "is",
-                        "object": "30"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Fully connected unit 100 Dropout 0.5 Learning rate 0.001",
-                "triplets": [
-                    {
-                        "subject": "Fully connected unit",
-                        "predicate": "has",
-                        "object": "100"
-                    },
-                    {
-                        "subject": "Dropout",
-                        "predicate": "is",
-                        "object": "0.5"
-                    },
-                    {
-                        "subject": "Learning rate",
-                        "predicate": "is",
-                        "object": "0.001"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Batch size 32",
-                "triplets": [
-                    {
-                        "subject": "Batch size",
-                        "predicate": "is",
-                        "object": "32"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Number of iterations 100",
-                "triplets": [
-                    {
-                        "subject": "Number of iterations",
-                        "predicate": "is",
-                        "object": "100"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Optimization function Adam Loss function Binary cross-entropy",
-                "triplets": [
-                    {
-                        "subject": "Optimization function",
-                        "predicate": "is",
-                        "object": "Adam"
-                    },
-                    {
-                        "subject": "Loss function",
-                        "predicate": "is",
-                        "object": "Binary cross-entropy"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "4.2.2. **Performance Evaluation of GPT Model for Text Modality**",
-                "triplets": [
-                    {
-                        "subject": "Performance Evaluation",
-                        "predicate": "is for",
-                        "object": "GPT Model"
-                    },
-                    {
-                        "subject": "Performance Evaluation",
-                        "predicate": "is of",
-                        "object": "Text Modality"
                     }
                 ]
             },
@@ -4993,21 +4088,6 @@
                 ]
             },
             {
-                "chunk_text": "4.2.3. **Performance Evaluation of CNN models for image modality**",
-                "triplets": [
-                    {
-                        "subject": "Performance Evaluation",
-                        "predicate": "is",
-                        "object": "for CNN models"
-                    },
-                    {
-                        "subject": "CNN models",
-                        "predicate": "are for",
-                        "object": "image modality"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "ResNet50 has achieved significant results on the disaster dataset, demonstrating its effectiveness in classifying and distinguishing between images from Informative and NonInformative tweets. In classifying images from Informative tweets, ResNet50 has shown _Table 2._ Performance Metrics of Different Models for Text Analysis.",
                 "triplets": [
                     {
@@ -5024,166 +4104,6 @@
                         "subject": "ResNet50",
                         "predicate": "has shown",
                         "object": "_Table 2._ Performance Metrics of Different Models for Text Analysis"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Models** **F1-score** **Accuracy Precision**",
-                "triplets": [
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "F1-score"
-                    },
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "Accuracy"
-                    },
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "Precision"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "RF 88.00 89.67 88.00",
-                "triplets": [
-                    {
-                        "subject": "RF",
-                        "predicate": "has precision",
-                        "object": "88.00"
-                    },
-                    {
-                        "subject": "RF",
-                        "predicate": "has recall",
-                        "object": "89.67"
-                    },
-                    {
-                        "subject": "RF",
-                        "predicate": "has F1 score",
-                        "object": "88.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "SVM 89.00 89.32 89.00",
-                "triplets": [
-                    {
-                        "subject": "SVM",
-                        "predicate": "has_precision",
-                        "object": "89.00"
-                    },
-                    {
-                        "subject": "SVM",
-                        "predicate": "has_recall",
-                        "object": "89.32"
-                    },
-                    {
-                        "subject": "SVM",
-                        "predicate": "has_f1_score",
-                        "object": "89.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Gaussian NB 74.00 75.00 80.00",
-                "triplets": [
-                    {
-                        "subject": "Gaussian NB",
-                        "predicate": "has_score",
-                        "object": "74.00"
-                    },
-                    {
-                        "subject": "Gaussian NB",
-                        "predicate": "has_score",
-                        "object": "75.00"
-                    },
-                    {
-                        "subject": "Gaussian NB",
-                        "predicate": "has_score",
-                        "object": "80.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "GLOVE 88.00 88.07 88.00",
-                "triplets": [
-                    {
-                        "subject": "GLOVE",
-                        "predicate": "has_score",
-                        "object": "88.00"
-                    },
-                    {
-                        "subject": "GLOVE",
-                        "predicate": "has_score",
-                        "object": "88.07"
-                    },
-                    {
-                        "subject": "GLOVE",
-                        "predicate": "has_score",
-                        "object": "88.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Word2Vec 89.00 88.75 89.00",
-                "triplets": [
-                    {
-                        "subject": "Word2Vec",
-                        "predicate": "has score",
-                        "object": "89.00"
-                    },
-                    {
-                        "subject": "Word2Vec",
-                        "predicate": "has score",
-                        "object": "88.75"
-                    },
-                    {
-                        "subject": "Word2Vec",
-                        "predicate": "has score",
-                        "object": "89.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "BERT 89.00 88.89 89.00",
-                "triplets": [
-                    {
-                        "subject": "BERT",
-                        "predicate": "has_precision",
-                        "object": "89.00"
-                    },
-                    {
-                        "subject": "BERT",
-                        "predicate": "has_recall",
-                        "object": "88.89"
-                    },
-                    {
-                        "subject": "BERT",
-                        "predicate": "has_F1_score",
-                        "object": "89.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "GPT 90.40 84.91 90.76",
-                "triplets": [
-                    {
-                        "subject": "GPT",
-                        "predicate": "has_score",
-                        "object": "90.40"
-                    },
-                    {
-                        "subject": "GPT",
-                        "predicate": "has_score",
-                        "object": "84.91"
-                    },
-                    {
-                        "subject": "GPT",
-                        "predicate": "has_score",
-                        "object": "90.76"
                     }
                 ]
             },
@@ -5228,96 +4148,6 @@
                 ]
             },
             {
-                "chunk_text": "_Table 3._ Performance Metrics of Different Models for Image Analysis.",
-                "triplets": [
-                    {
-                        "subject": "Table 3",
-                        "predicate": "contains",
-                        "object": "Performance Metrics of Different Models for Image Analysis"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Models** **F1-score** **Accuracy Precision**",
-                "triplets": [
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "F1-score"
-                    },
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "Accuracy"
-                    },
-                    {
-                        "subject": "Models",
-                        "predicate": "has",
-                        "object": "Precision"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "VGG16 71.00 71.04 71.00",
-                "triplets": [
-                    {
-                        "subject": "VGG16",
-                        "predicate": "has_accuracy",
-                        "object": "71.00"
-                    },
-                    {
-                        "subject": "VGG16",
-                        "predicate": "has_accuracy",
-                        "object": "71.04"
-                    },
-                    {
-                        "subject": "VGG16",
-                        "predicate": "has_accuracy",
-                        "object": "71.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "VGG19 74.00 73.96 74.00",
-                "triplets": [
-                    {
-                        "subject": "VGG19",
-                        "predicate": "has",
-                        "object": "74.00"
-                    },
-                    {
-                        "subject": "VGG19",
-                        "predicate": "has",
-                        "object": "73.96"
-                    },
-                    {
-                        "subject": "VGG19",
-                        "predicate": "has",
-                        "object": "74.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "InceptionV3 80.00 80.51 80.00",
-                "triplets": [
-                    {
-                        "subject": "InceptionV3",
-                        "predicate": "has_accuracy",
-                        "object": "80.00"
-                    },
-                    {
-                        "subject": "InceptionV3",
-                        "predicate": "has_top1_accuracy",
-                        "object": "80.51"
-                    },
-                    {
-                        "subject": "InceptionV3",
-                        "predicate": "has_top5_accuracy",
-                        "object": "80.00"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "DenseNet121 82.00 81.59 82.00 EfficientNetV2 77.00 77.10 77.00",
                 "triplets": [
                     {
@@ -5349,36 +4179,6 @@
                         "subject": "EfficientNetV2",
                         "predicate": "has_top5_accuracy",
                         "object": "77.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "ResNet50 88.00 88.56 88.00",
-                "triplets": [
-                    {
-                        "subject": "ResNet50",
-                        "predicate": "has_score",
-                        "object": "88.00"
-                    },
-                    {
-                        "subject": "ResNet50",
-                        "predicate": "has_score",
-                        "object": "88.56"
-                    },
-                    {
-                        "subject": "ResNet50",
-                        "predicate": "has_score",
-                        "object": "88.00"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "4.2.4. **Performance evaluation of Fusion Text and Image Modalities**",
-                "triplets": [
-                    {
-                        "subject": "4.2.4",
-                        "predicate": "is_about",
-                        "object": "Performance evaluation of Fusion Text and Image Modalities"
                     }
                 ]
             },
@@ -5439,36 +4239,6 @@
                         "subject": "Performance metrics",
                         "predicate": "categorized by",
                         "object": "Informative vs Non-Informative categories"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Models** **Accuracy** **(%)**",
-                "triplets": [
-                    {
-                        "subject": "Models",
-                        "predicate": "have",
-                        "object": "Accuracy (%)"
-                    },
-                    {
-                        "subject": "Accuracy (%)",
-                        "predicate": "is",
-                        "object": "a metric for Models"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "**Recall** **(%)**",
-                "triplets": [
-                    {
-                        "subject": "Recall",
-                        "predicate": "is measured in",
-                        "object": "percentage"
-                    },
-                    {
-                        "subject": "Recall",
-                        "predicate": "is a metric for",
-                        "object": "evaluating classification models"
                     }
                 ]
             },
@@ -5618,10 +4388,6 @@
                 ]
             },
             {
-                "chunk_text": "10",
-                "triplets": []
-            },
-            {
                 "chunk_text": "The efficacy of these fusion strategies was rigorously evaluated, and our model outperformed traditional methods employing other multimodal fusion strategies. The results demonstrate that effective feature integration can reveal complex, hidden associations between modalities that are often oversimplified or overlooked by other techniques. This supports our hypothesis that the depth of contextual understanding is significantly enhanced when features interact dynamically. Our multimodal data fusion approach benefited not just from the combination of textual and visual cues, but from the contextualized fusion, which facilitated the nuanced interaction between these modalities. The addition of contextual attention provided the granularity needed for a detailed sentiment analysis, contributing to the improved accuracy and robustness of our model.",
                 "triplets": [
                     {
@@ -5668,16 +4434,6 @@
                         "subject": "contextual attention",
                         "predicate": "contributed to",
                         "object": "the improved accuracy and robustness of our model"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "5. **Ablation Study**",
-                "triplets": [
-                    {
-                        "subject": "Ablation Study",
-                        "predicate": "is",
-                        "object": "Section 5"
                     }
                 ]
             },
@@ -5832,31 +4588,6 @@
                 ]
             },
             {
-                "chunk_text": "_Table 5._ Ablation Study: Performance of Different Configurations on CrisisMMD",
-                "triplets": [
-                    {
-                        "subject": "Ablation Study",
-                        "predicate": "focuses on",
-                        "object": "Performance of Different Configurations"
-                    },
-                    {
-                        "subject": "Performance of Different Configurations",
-                        "predicate": "is evaluated on",
-                        "object": "CrisisMMD"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "Dataset",
-                "triplets": [
-                    {
-                        "subject": "Dataset",
-                        "predicate": "is",
-                        "object": "a collection of data"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "**Models** **F1-Score** **Accuracy** (Simple GPT) 90.40 84.91 (GPT, single prompt) 92.43 87.74 (GPT, prompt with varied text) 92.70 88.36 (GPT, prompt and fine-tuning) 93.10 88.99 Image Only (CNN) 81.00 88.56 Contextual-Attention (Ours) **96.77** **93.75**",
                 "triplets": [
                     {
@@ -5967,20 +4698,6 @@
                 ]
             },
             {
-                "chunk_text": "11",
-                "triplets": []
-            },
-            {
-                "chunk_text": "5.1. **Discussion**",
-                "triplets": [
-                    {
-                        "subject": "Discussion",
-                        "predicate": "is",
-                        "object": "section 5.1"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "The ablation study reveals key insights into the model’s performance across different configurations. The LLM-based text models demonstrate strong effectiveness in sentiment analysis, with the simple GPT model achieving an F1-score of 90.40% and an accuracy of 84.91%. Introducing a prompt further enhances performance, with the best LLM-based configuration (GPT with prompt and fine-tuning) achieving an F1-score of 93.10% and an accuracy of 88.99%. This underscores the importance of prompt engineering and fine-tuning in optimizing LLM performance for sentiment analysis. The CNN-based image-only model, on the other hand, achieves an F1-score of 81.00% and an accuracy of 88.56%, highlighting the limitations of relying solely on visual features due to the lack of textual context.",
                 "triplets": [
                     {
@@ -6077,16 +4794,6 @@
                         "subject": "Our ablation study",
                         "predicate": "demonstrates",
                         "object": "the effectiveness of our model in unimodal scenarios"
-                    }
-                ]
-            },
-            {
-                "chunk_text": "6. **Conclusion**",
-                "triplets": [
-                    {
-                        "subject": "Conclusion",
-                        "predicate": "is",
-                        "object": "section 6"
                     }
                 ]
             },
@@ -6201,16 +4908,6 @@
                 ]
             },
             {
-                "chunk_text": "**References**",
-                "triplets": [
-                    {
-                        "subject": "References",
-                        "predicate": "is",
-                        "object": "a section"
-                    }
-                ]
-            },
-            {
                 "chunk_text": "[1] W. Mai, Z. Zhang, K. Li, Y. Xue, and F. Li. “Dynamic Graph Construction Framework for Multimodal Named Entity Recognition in Social Media”. In: _IEEE Transactions on Compu-_ _tational Social Systems_ 11 (2024), pp. 2513–2522.",
                 "triplets": [
                     {
@@ -6294,10 +4991,6 @@
                         "object": "355-369"
                     }
                 ]
-            },
-            {
-                "chunk_text": "12",
-                "triplets": []
             },
             {
                 "chunk_text": "[3] Z.-X. Dong and H. Liu. “Recent Advancements and Challenges in Multimodal Sentiment Analysis: A Survey”. In: _2023 International Conference on Machine Learning and Cybernetics_ _(ICMLC)_ (2023), pp. 464–469.",
