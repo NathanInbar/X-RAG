@@ -86,20 +86,19 @@ async def write(cypher:str, params: Mapping[str, Any]|None = None) -> list[dict[
         raise Exception(f"Graph write transport error: {e}") from e
     except Exception as e:
         raise Exception(f"Graph write failed: {e}") from e
-    
-# cypher helpers for KG
 
-# async def merge_entity(key: str, *, name: str) -> None:
-#     """
-#     Idempotently upsert an :Entity by key
-#     """
-#     await write(
-#         """
-#         MERGE (n:Entity {key:$key})
-#         ON CREATE SET n.name = $name
-#         """,
-#         {"key":key, "name": name}
-#     )
+async def clear() -> None:
+    """
+    Wipes all elements from the graph
+    """
+    await write(
+        """
+        MATCH (a)
+        DETACH DELETE a
+        """
+    )
+
+# cypher helpers for KG
 
 async def merge_triple(triple:SPOTriple, source_doc_id:int, source_chunk_id:int) -> None:
     """
@@ -123,16 +122,15 @@ async def merge_triple(triple:SPOTriple, source_doc_id:int, source_chunk_id:int)
           ON CREATE SET b.name = $oname
         MERGE (a)-[r:Relation {key:$pkey}]->(b)
           ON CREATE SET
-            r.name = $pname,
-            r.source_doc_ids = [$doc],
-            r.source_chunk_ids = [$chunk]
-        WITH r, coalesce(r.source_doc_ids, []) AS doc_ids, coalesce(r.source_chunk_ids, []) AS chunk_ids
+            r.name = $pname
         WITH r,
-            (CASE WHEN $doc IN doc_ids THEN doc_ids ELSE doc_ids+[$doc] END) AS merged_doc_ids,
-            chunk_ids + $chunk AS merged_chunk_ids
-        UNWIND merged_chunk_ids AS cids
-        WITH r, merged_doc_ids, collect(DISTINCT cids) AS dedup_cids
-        SET r.source_doc_ids = merged_doc_ids, r.source_chunk_ids = dedup_cids
+            coalesce(r.source_doc_ids, []) AS doc_ids, 
+            coalesce(r.source_chunk_ids, []) AS chunk_ids
+        WITH r,
+        (CASE WHEN $doc IN doc_ids THEN doc_ids ELSE doc_ids+[$doc] END) AS merged_doc_ids,
+        (CASE WHEN $chunk IN chunk_ids THEN chunk_ids ELSE chunk_ids+[$chunk] END) as merged_chunk_ids
+        SET r.source_doc_ids = merged_doc_ids, r.source_chunk_ids = merged_chunk_ids
+        
         """,
         {
             "sname": triple['s'],
