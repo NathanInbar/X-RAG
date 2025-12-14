@@ -1,0 +1,2 @@
+CREATE INDEX ON :`Entity`(`key`);
+CREATE CONSTRAINT ON (u:`Entity`) ASSERT u.`key` IS UNIQUE;

@@ -1,0 +1,147 @@
+import asyncio
+import re
+from neo4j import AsyncGraphDatabase, AsyncDriver
+
+#TODO: refactor to shared models
+from typing import TypedDict
+class SPOTriple (TypedDict):
+    s:str # subject
+    p:str # predicate
+    o:str # object
+
+_MG_URI = "bolt://localhost:7687"
+
+_driver: AsyncDriver | None = None
+_init_lock = asyncio.Lock()
+
+async def init():
+    """
+    Initialize the global mempgraph client (neo4j driver), connecting to the memgraph instance
+    """
+    global _driver
+
+    async with _init_lock:
+        if _driver is not None:
+            pass
+
+        try:
+            _driver = AsyncGraphDatabase.driver(uri = _MG_URI, auth = None)
+            await _driver.verify_connectivity()
+        except Exception as e:
+            _driver = None
+            raise Exception(f"Couldn't connect to memgraph (uri: '{_MG_URI}', auth: None): {e}") from e
+
+async def close():
+    """
+    Close the global driver connection
+    """
+    global _driver
+    if _driver is not None:
+        await _driver.close()
+        _driver = None
+
+def _get_driver() -> AsyncDriver:
+    if _driver is None:
+        raise Exception("MG Driver not initialized, call init() first.")
+    return _driver
+
+from typing import Mapping, Any
+ 
+async def read(cypher:str, params: Mapping[str, Any]|None = None) -> list[dict[str,Any]]:
+    """
+    Run a read query, return a list of dict rows
+    """
+    driver = _get_driver()
+    try:
+        async with driver.session() as session:
+            async def work(tx):
+                res = await tx.run(cypher, params or {})
+                return [record.data() async for record in res]
+            
+            return await session.execute_read(work)
+    except (OSError, ConnectionError) as e:
+        raise Exception(f"Graph read transport error: {e}") from e
+    except Exception as e:
+        raise Exception(f"Graph read failed: {e}") from e
+    
+async def write(cypher:str, params: Mapping[str, Any]|None = None) -> list[dict[str,Any]]|None:
+    """
+    Run a write query, optionally return a list of dict rows if the query returns any
+    """
+    driver = _get_driver()
+    try:
+        async with driver.session() as session:
+
+            async def work(tx):
+                res = await tx.run(cypher, params or {})
+                # Some writes RETURN values, some don't.
+                try:
+                    return [record.data() async for record in res]
+                except Exception:
+                    await res.consume()
+                    return None
+
+            return await session.execute_write(work)
+    except (OSError, ConnectionError) as e:
+        raise Exception(f"Graph write transport error: {e}") from e
+    except Exception as e:
+        raise Exception(f"Graph write failed: {e}") from e
+    
+# cypher helpers for KG
+
+# async def merge_entity(key: str, *, name: str) -> None:
+#     """
+#     Idempotently upsert an :Entity by key
+#     """
+#     await write(
+#         """
+#         MERGE (n:Entity {key:$key})
+#         ON CREATE SET n.name = $name
+#         """,
+#         {"key":key, "name": name}
+#     )
+
+async def merge_triple(triple:SPOTriple, source_doc_id:int, source_chunk_id:int) -> None:
+    """
+    Upsert an (:Entity) - [:Relation] -> (:Entity) into memgraph from a source SPO triple.
+    Performs distinct union on the provenance information (source document id, source chunk ids from document)
+    """
+    def _normalize_entity_name(name:str) -> str:
+        """
+        Deterministically normalize an entity name into a distinct key
+        """
+        s = name.strip().lower()
+        s = re.sub(r"[^\w]+", "_", s)
+        s = re.sub(r"_+", "_", s).strip("_")
+        return s or "_" # never empty
+    
+    await write(
+        """
+        MERGE (a:Entity {key:$skey})
+          ON CREATE SET a.name = $sname
+        MERGE (b:Entity {key:$okey})
+          ON CREATE SET b.name = $oname
+        MERGE (a)-[r:Relation {key:$pkey}]->(b)
+          ON CREATE SET
+            r.name = $pname,
+            r.source_doc_ids = [$doc],
+            r.source_chunk_ids = [$chunk]
+        WITH r, coalesce(r.source_doc_ids, []) AS doc_ids, coalesce(r.source_chunk_ids, []) AS chunk_ids
+        WITH r,
+            (CASE WHEN $doc IN doc_ids THEN doc_ids ELSE doc_ids+[$doc] END) AS merged_doc_ids,
+            chunk_ids + $chunk AS merged_chunk_ids
+        UNWIND merged_chunk_ids AS cids
+        WITH r, merged_doc_ids, collect(DISTINCT cids) AS dedup_cids
+        SET r.source_doc_ids = merged_doc_ids, r.source_chunk_ids = dedup_cids
+        """,
+        {
+            "sname": triple['s'],
+            "pname": triple['p'],
+            "oname": triple["o"],
+            "skey": _normalize_entity_name(triple['s']),
+            "pkey": _normalize_entity_name(triple['p']),
+            "okey": _normalize_entity_name(triple['o']),
+            "doc": source_doc_id,
+            "chunk": source_chunk_id
+        }
+    )
