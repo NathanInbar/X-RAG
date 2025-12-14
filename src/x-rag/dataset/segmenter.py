@@ -103,6 +103,8 @@ def process(input_filename: str, output_filename: str) -> None:
                     if num_tokens < MIN_CHUNK_TOKENS_THRESH:
                         # trim small token chunks
                         continue
+
+                    #TODO create embedding for it
                     chunks.append(chunk_text)
 
                     token_counts.append(num_tokens)
