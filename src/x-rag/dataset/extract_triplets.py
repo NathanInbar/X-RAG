@@ -11,7 +11,7 @@ import litellm
 
 SRC = Path(__file__).resolve().parents[2]
 
-EXTRACTION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
+EXTRACTION_MODEL = "anthropic.claude-opus-4-5-20251101-v1:0"
 
 class _ExtractTriples(dspy.Signature):
     """
@@ -64,6 +64,8 @@ class TripletExtractor:
 
             if not (s and p and o):
                 continue
+                #TODO normalize surfaces
+                #TODO build canonical entity dictionary
 
             out.append({"subject": s, "predicate": p, "object": o})
 
@@ -77,7 +79,7 @@ async def process(
     *,
     max_parallel: int = 8,
 ):
-    """
+    """ 
     - Reads input as a stream (ijson)
     - For each source object, runs chunk extraction concurrently (bounded)
     - Writes output sequentially (single coroutine) to avoid race conditions
