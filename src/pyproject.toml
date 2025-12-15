@@ -20,6 +20,10 @@ utils = [
     "pymupdf4llm",
     "ijson==3.4.0"
 ]
+leanrag = [
+    "yake",
+    "scikit-learn"
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

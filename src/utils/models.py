@@ -2,6 +2,7 @@ from typing import TypedDict
 
 type HexID = str
 
+#TODO: remove this
 class ExtractedSource(dict):
     id:HexID
     source: str
@@ -18,3 +19,8 @@ class Chunk (TypedDict):
     approx_n_tokens:int
     embedding:list[float]
     triples:list[SPOTriple]
+
+class DocData (TypedDict):
+    id: HexID
+    source: str # name
+    chunks: list[Chunk]
