@@ -1,5 +1,5 @@
 from hashlib import blake2b
-from .models import Chunk, HexID
+from .models import Chunk, HexID, DocData
 
 def stable_id_hex(s: str, nbytes: int = 16) -> HexID:
     """
@@ -26,3 +26,12 @@ def print_chunks_view(chunks:list[Chunk],max_chunks_print = 10, max_field_len_pr
         if 'triples' in _chunk.keys():
             print(f"trips:\t\t{_ellipsize(_chunk['triples'], max_field_len_print)}")
         print("\n")
+
+def get_chunk_from_id(dataset:DocData, id:HexID) -> Chunk|None:
+    """ O(n) search through chunks"""
+
+    for doc_data in dataset:
+        for chunk in doc_data['chunks']:
+            if chunk['id'] == id:
+                return chunk
+    return None
