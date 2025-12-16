@@ -11,7 +11,14 @@ dependencies = [
     "wtpsplit[onnx-cpu]>=2.1.6",
     "wtpsplit[onnx-gpu]>=2.1.6",
     "python-dotenv",
-    "scikit-learn"
+    "scikit-learn",
+    "aiolimiter>=1.2.1",
+    "asyncio>=4.0.0",
+    "boto3>=1.39.11",
+    "ipykernel>=7.1.0",
+    "litellm>=1.80.0",
+    "networkx>=3.6.1",
+    "prettytable>=3.17.0",
 ]
 
 [project.optional-dependencies]
