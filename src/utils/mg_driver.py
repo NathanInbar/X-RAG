@@ -1,13 +1,7 @@
 import asyncio
-import re
 from neo4j import AsyncGraphDatabase, AsyncDriver
-
-#TODO: refactor to shared models
-from typing import TypedDict
-class SPOTriple (TypedDict):
-    s:str # subject
-    p:str # predicate
-    o:str # object
+from utils import normalize_from_name
+from utils.models import SPOTriple
 
 _MG_URI = "bolt://localhost:7687"
 
@@ -100,29 +94,20 @@ async def clear() -> None:
 
 # cypher helpers for KG
 
-async def merge_triple(triple:SPOTriple, source_doc_id:int, source_chunk_id:int) -> None:
+async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str], source_doc_id:int, source_chunk_id:int) -> None:
     """
     Upsert an (:Entity) - [:Relation] -> (:Entity) into memgraph from a source SPO triple.
     Performs distinct union on the provenance information (source document id, source chunk ids from document)
     """
-    def _normalize_entity_name(name:str) -> str:
-        """
-        Deterministically normalize an entity name into a distinct key
-        """
-        s = name.strip().lower()
-        s = re.sub(r"[^\w]+", "_", s)
-        s = re.sub(r"_+", "_", s).strip("_")
-        return s or "_" # never empty
-    
     await write(
         """
         MERGE (a:Entity {key:$skey})
-          ON CREATE SET a.name = $sname
+          ON CREATE SET a.name = $sname, a.desc = $sdesc
         MERGE (b:Entity {key:$okey})
-          ON CREATE SET b.name = $oname
+          ON CREATE SET b.name = $oname, b.desc = $odesc
         MERGE (a)-[r:Relation {key:$pkey}]->(b)
           ON CREATE SET
-            r.name = $pname
+            r.name = $pname, r.desc = $rdesc
         WITH r,
             coalesce(r.source_doc_ids, []) AS doc_ids, 
             coalesce(r.source_chunk_ids, []) AS chunk_ids
@@ -136,9 +121,12 @@ async def merge_triple(triple:SPOTriple, source_doc_id:int, source_chunk_id:int)
             "sname": triple['s'],
             "pname": triple['p'],
             "oname": triple["o"],
-            "skey": _normalize_entity_name(triple['s']),
-            "pkey": _normalize_entity_name(triple['p']),
-            "okey": _normalize_entity_name(triple['o']),
+            "sdesc": triple_descriptions[0],
+            "rdesc": triple_descriptions[1],
+            "odesc": triple_descriptions[2],
+            "skey": normalize_from_name(triple['s']),
+            "pkey": normalize_from_name(triple['p']),
+            "okey": normalize_from_name(triple['o']),
             "doc": source_doc_id,
             "chunk": source_chunk_id
         }
