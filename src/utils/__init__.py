@@ -35,3 +35,16 @@ def get_chunk_from_id(dataset:DocData, id:HexID) -> Chunk|None:
             if chunk['id'] == id:
                 return chunk
     return None
+
+def infer_schema(obj):
+    """infer schema of a json obj"""
+    if isinstance(obj, dict):
+        return {
+            k: infer_schema(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        if not obj:
+            return []
+        return [infer_schema(obj[0])]
+    return type(obj).__name__
