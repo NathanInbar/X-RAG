@@ -94,7 +94,7 @@ async def clear() -> None:
 
 # cypher helpers for KG
 
-async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str], source_doc_id:int, source_chunk_id:int) -> None:
+async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str], source_doc_id:int, source_chunk_id:int, layer:int=0) -> None:
     """
     Upsert an (:Entity) - [:Relation] -> (:Entity) into memgraph from a source SPO triple.
     Performs distinct union on the provenance information (source document id, source chunk ids from document)
@@ -102,12 +102,12 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
     await write(
         """
         MERGE (a:Entity {key:$skey})
-          ON CREATE SET a.name = $sname, a.desc = $sdesc
+          ON CREATE SET a.name = $sname, a.desc = $sdesc, a.layer=$layer
         MERGE (b:Entity {key:$okey})
-          ON CREATE SET b.name = $oname, b.desc = $odesc
+          ON CREATE SET b.name = $oname, b.desc = $odesc, b.layer = $layer
         MERGE (a)-[r:Relation {key:$pkey}]->(b)
           ON CREATE SET
-            r.name = $pname, r.desc = $rdesc
+            r.name = $pname, r.desc = $rdesc, r.layer = $layer
         WITH r,
             coalesce(r.source_doc_ids, []) AS doc_ids, 
             coalesce(r.source_chunk_ids, []) AS chunk_ids
@@ -128,6 +128,19 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
             "pkey": normalize_from_name(triple['p']),
             "okey": normalize_from_name(triple['o']),
             "doc": source_doc_id,
-            "chunk": source_chunk_id
+            "chunk": source_chunk_id,
+            "layer": layer
+        }
+    )
+
+async def get_entity_descs_for_layer(layer:int) -> dict[str,str]:
+    """
+    Get a map of entity key -> entity description for all entities in a layer
+    """
+    await read(
+        """
+        """,
+        {
+            
         }
     )
