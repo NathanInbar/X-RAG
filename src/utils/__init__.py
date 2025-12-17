@@ -1,5 +1,15 @@
 from hashlib import blake2b
 from .models import Chunk, HexID, DocData
+import re
+
+def normalize_from_name(name:str) -> str:
+    """
+    Deterministically normalize a name into a distinct key
+    """
+    s = name.strip().lower()
+    s = re.sub(r"[^\w]+", "_", s)
+    s = re.sub(r"_+", "_", s).strip("_")
+    return s or "_" # never empty
 
 def stable_id_hex(s: str, nbytes: int = 16) -> HexID:
     """
