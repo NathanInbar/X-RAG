@@ -1,6 +1,8 @@
 from hashlib import blake2b
 from .models import Chunk, HexID, DocData
 import re
+from itertools import islice
+
 
 def normalize_from_name(name:str) -> str:
     """
@@ -58,3 +60,13 @@ def infer_schema(obj):
             return []
         return [infer_schema(obj[0])]
     return type(obj).__name__
+
+def batched(iterable, size):
+    if size < 1:
+        raise ValueError("size must be at least 1")
+    it = iter(iterable)
+    while True:
+        batch = list(islice(it, size))
+        if not batch:
+            break
+        yield batch

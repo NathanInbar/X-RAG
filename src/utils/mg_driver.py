@@ -135,12 +135,11 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
 
 async def get_entity_descs_for_layer(layer:int) -> dict[str,str]:
     """
-    Get a map of entity key -> entity description for all entities in a layer
+    Get a map of entity key -> entity description for all entities in a layer.
+    Returns list [ {'key': entity_key, 'desc': entity_description}, ...]
     """
-    await read(
-        """
-        """,
-        {
-            
-        }
+    resp = await read(
+        """ MATCH (a:Entity {layer:$layer}) RETURN a.key AS key, a.desc AS desc""",
+        {"layer": layer}
     )
+    return resp
