@@ -237,3 +237,13 @@ async def set_root_entities(entity_keys:list[str]) -> None:
         SET n:Root
         """
     )
+
+async def count_entities() -> int:
+    """ Returns the count of nodes with :Entity label """
+    resp = await read(
+        """
+        MATCH (:Entity)
+        RETURN count(*) AS count
+        """
+    )
+    return resp[0]['count']
