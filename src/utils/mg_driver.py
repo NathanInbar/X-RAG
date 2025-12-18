@@ -133,13 +133,52 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
         }
     )
 
-async def get_entity_descs_for_layer(layer:int) -> dict[str,str]:
+async def get_entities_for_layer(layer:int) -> dict[str,str]:
     """
-    Get a map of entity key -> entity description for all entities in a layer.
-    Returns list [ {'key': entity_key, 'desc': entity_description}, ...]
+    Get all entities in a layer.
+    Returns list of {key:str, name:str, desc:str, degree:int}
     """
     resp = await read(
-        """ MATCH (a:Entity {layer:$layer}) RETURN a.key AS key, a.desc AS desc""",
+        """
+        MATCH (a:Entity {layer:$layer})
+        RETURN a.key AS key, a.name AS name, a.desc AS desc, degree(a) AS degree
+        """,
         {"layer": layer}
     )
     return resp
+
+async def get_intra_cluster_relations(cluster):
+    """
+    Get relations between all entities in a cluster
+    """
+    resp = await read(
+        """
+        MATCH (a:Entity)-[r]->(b:Entity)
+        WHERE a.key IN $entity_keys AND b.key IN $entity_keys
+        RETURN a.name as source_entity, b.name as target_entity, r.desc as relation_description
+        """,
+        {
+            "entity_keys": [e['key'] for e in cluster]
+        }
+    )
+    return resp
+
+async def create_aggregate_entity(agg_entity, children_entity_keys):
+    """
+    (LeanRAG) create a new aggregate entity
+    """
+    await write(
+        """
+        MERGE (n:AggEntity {key: $agg_key})
+        ON CREATE SET n.name = $agg_name
+        WITH n
+        UNWIND $child_entity_keys AS child_key
+        MATCH (c:Entity {key: child_key})
+        MERGE (c)-[:IS_CHILD_OF]->(n)
+        """,
+        {
+            "agg_key": agg_entity['key'],
+            "agg_name": agg_entity['name'],
+            "child_entity_keys" : children_entity_keys
+        }
+    )
