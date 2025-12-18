@@ -1,5 +1,8 @@
-from typing import TypedDict
+import asyncio
+from typing import TypedDict, TypeVar, Generic
+from tqdm import tqdm
 
+T = TypeVar("T")
 type HexID = str
 
 #TODO: remove this
@@ -60,13 +63,14 @@ class EntityDescEmbed(TypedDict):
     desc_embed:list[float]
 
 
-class AsyncList:
+
+class AsyncList(Generic[T]):
     """write-protected list via asyncio lock"""
     def __init__(self):
-        self._list = []
+        self._list:list[T] = []
         self._lock = asyncio.Lock()
 
-    def __getitem__(self, index:int):
+    def __getitem__(self, index:int) -> T:
         """only read from this. elements are not write-protected"""
         return self._list[index]
 
@@ -82,6 +86,24 @@ class AsyncList:
         async with self._lock:
             self._list.append(itm)
 
-    async def get_list(self):
+    def get_list(self):
         """only perform read operations from this"""
         return self._list
+    
+    async def clear(self):
+        async with self._lock:
+            self._list.clear() 
+    
+class AsyncProgressBar:
+    """ simple asyncio locked tqdm progress bar """
+    def __init__(self, total:int, desc:str):
+        self._pbar = tqdm(total=total, desc=desc)
+        self._lock = asyncio.Lock()
+
+    async def update(self, amt:int):
+        async with self._lock:
+            self._pbar.update(amt)
+
+    async def close(self):
+        async with self._lock:
+            self._pbar.close()

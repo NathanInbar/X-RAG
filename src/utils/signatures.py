@@ -1,7 +1,11 @@
 import dspy
-from asyncio import Semaphore
+from asyncio import Semaphore, Lock
 from utils.models import Finding, AggEntity, EntityRelation
 from utils import normalize_from_name
+
+AGGREGATION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
+
+_lm_aggregator= dspy.LM(model = AGGREGATION_MODEL)
 
 class _CreateAggregateNode(dspy.Signature):
     """
@@ -42,29 +46,33 @@ You are an expert in concept synthesis. Your task is to identify a meaningful ag
             "{'summary': '...', 'explanation': '...'}, "
             "{'summary': '...', 'explanation': '...'}"
             "]"))
-
-async def generate_aggregate_node(input_text:str, findings_map:dict[str,list[Finding]], sem:Semaphore=None) -> AggEntity|None:
-    try:
-        if(sem):
-            await sem.acquire()
-        pred=await dspy.predict(_CreateAggregateNode(input_text=input_text))
-        if(sem):
-            sem.release()
-
-        if not pred: raise RuntimeError("empty prediction")
-    except Exception:
-        return None
     
+PRED_CREATE_AGG_NODE = dspy.Predict(_CreateAggregateNode)
+async def generate_aggregate_node(
+    input_text: str,
+    sem: Semaphore | None = None
+) -> tuple[AggEntity | None, list[Finding] | None]:
+    try:
+        if sem:
+            async with sem:
+                with dspy.context(lm=_lm_aggregator):
+                    pred = await PRED_CREATE_AGG_NODE.acall(input_text=input_text)
+        else:
+            with dspy.context(lm=_lm_aggregator):
+                pred = await PRED_CREATE_AGG_NODE.acall(input_text=input_text)
+
+        if not pred:
+            raise RuntimeError("empty prediction")
+
+    except NotImplementedError: # ignore error silencing for now
+        return (None, None)
+
     agg_entity = AggEntity(
-        key=normalize_from_name(pred['entity_name']),
-        name=pred['entity_name'],
-        description=pred['entity_description']
+        key=normalize_from_name(pred["entity_name"]),
+        name=pred["entity_name"],
+        description=pred["entity_description"],
     )
-
-    # set entry in the findings map
-    findings_map[agg_entity['key']] = pred['findings']
-
-    return agg_entity
+    return (agg_entity, pred["findings"])
 
 class _CreateAggregateRel(dspy.Signature):
     """
@@ -115,7 +123,7 @@ WTO External Contributors played an advisory role to the WTO Flagship Reports ag
     aggregate_b_desc:str = dspy.InputField(desc="Description of Aggregate B")
     sub_entity_relationships:list[str] = dspy.InputField(desc="The sub-entity relationships between entities in aggregate A and B")
     summary:str = dspy.OutputField(desc="The high-level, abstract summary sentence describing how two named aggregations are connected")
-
+PRED_CREATE_AGG_REL = dspy.Predict(_CreateAggregateRel)
 async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_cluster_relations=list[EntityRelation], sem:Semaphore=None) -> str:
     """ Using 2 aggregate entities, and a list of the inter-cluster relations, create a summary for the relation between aggregate A and B"""
 
@@ -126,6 +134,7 @@ async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_clu
         if(sem):
             await sem.acquire()
 
+        #FIXME: await module level predictor .acall
         pred=await dspy.predict(_CreateAggregateRel(
             aggregate_a_name = agg_a["name"],
             aggregate_a_desc = agg_a["description"],
