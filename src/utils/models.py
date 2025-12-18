@@ -52,6 +52,7 @@ class IntrClusterRel(TypedDict):
     """ Intra / Inter cluster relation"""
     source_entity:str
     target_entity:str
+    relation:str
     relation_description:str
 
 class Finding(TypedDict):

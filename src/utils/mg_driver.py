@@ -140,7 +140,7 @@ async def get_entities_for_layer(layer:int) -> list[Entity]:
     """
     resp = await read(
         """
-        MATCH (a:Entity {layer:$layer})
+        MATCH (a:Entity|AggEntity {layer:$layer})
         RETURN a.key AS key, a.name AS name, a.desc AS desc, degree(a) AS degree
         """,
         {"layer": layer}
@@ -174,7 +174,7 @@ async def get_inter_cluster_relations(cluster_A:Cluster, cluster_B:Cluster) -> l
         """
         MATCH (a:Entity)-[r:Relation]-(b:Entity)
         WHERE a.key IN $a_keys AND b.key IN $b_keys
-        RETURN a.name as source_entity, b.name as target_entity, r.desc as relation_description
+        RETURN a.name as source_entity, b.name as target_entity, r.name as relation, r.desc as relation_description
         """,
         {
             "a_keys" : entities_A,
@@ -211,10 +211,13 @@ async def create_inter_cluster_relation(agg_A:AggEntity, agg_B:AggEntity, rel_de
     """
     new_r_key = f"{agg_A['key']}__{agg_B['key']}"
 
-    await write(
+    res = await write(
         """
-        MERGE (a:AggEntity {key: $a_key})-[r:AggRelation {key: $r_key}]->(b:AggEntity {key: $b_key})
+        MATCH (a:AggEntity {key: $a_key})
+        MATCH (b:AggEntity {key: $b_key})
+        MERGE (a)-[r:AggRelation {key: $r_key}]->(b)
         ON CREATE SET r.desc = $r_desc, r.layer = $layer
+        RETURN r;
         """,
         {
             "a_key": agg_A['key'],
@@ -224,6 +227,8 @@ async def create_inter_cluster_relation(agg_A:AggEntity, agg_B:AggEntity, rel_de
             "layer": layer
         }
     )
+    if len(res) == 0:
+        raise RuntimeError(f"Inter-cluster relation cypher failure:\n\t Likely couldnt match an AggEntity '{agg_A['key']}' and '{agg_B['key']}'")
 
 async def set_root_entities(entity_keys:list[str]) -> None:
     """
