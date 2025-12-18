@@ -1,7 +1,7 @@
 import asyncio
 from neo4j import AsyncGraphDatabase, AsyncDriver
 from utils import normalize_from_name
-from utils.models import SPOTriple
+from utils.models import SPOTriple, Entity, AggEntity, IntrClusterRel, Cluster
 
 _MG_URI = "bolt://localhost:7687"
 
@@ -133,7 +133,7 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
         }
     )
 
-async def get_entities_for_layer(layer:int) -> dict[str,str]:
+async def get_entities_for_layer(layer:int) -> list[Entity]:
     """
     Get all entities in a layer.
     Returns list of {key:str, name:str, desc:str, degree:int}
@@ -147,7 +147,7 @@ async def get_entities_for_layer(layer:int) -> dict[str,str]:
     )
     return resp
 
-async def get_intra_cluster_relations(cluster):
+async def get_intra_cluster_relations(cluster:Cluster) -> list[IntrClusterRel]:
     """
     Get relations between all entities in a cluster
     """
@@ -163,31 +163,35 @@ async def get_intra_cluster_relations(cluster):
     )
     return resp
 
-async def get_inter_cluster_relations(cluster_A, cluster_B):
+async def get_inter_cluster_relations(cluster_A:Cluster, cluster_B:Cluster) -> list[IntrClusterRel]:
     """
     Get relations across clusters A and B (relations between entities in A and B)
     """
-    raise NotImplementedError()
-    entities_A = []
-    entities_B = []
+    entities_A = [e['key'] for e in cluster_A]
+    entities_B = [e['key'] for e in cluster_B]
 
     resp = await read(
         """
         MATCH (a:Entity)-[r:Relation]-(b:Entity)
         WHERE a.key IN $a_keys AND b.key IN $b_keys
-        RETURN r as inter_relations
-        """
+        RETURN a.name as source_entity, b.name as target_entity, r.desc as relation_description
+        """,
+        {
+            "a_keys" : entities_A,
+            "b_keys" : entities_B
+        }
     )
     return resp
 
-async def create_aggregate_entity(agg_entity, children_entity_keys):
+async def create_aggregate_entity(agg_entity:AggEntity, cluster:Cluster, layer:int) -> None:
     """
-    (LeanRAG) create a new aggregate entity
+    (LeanRAG) create a new aggregate entity for a cluster
     """
+    children_entity_keys:list[str] = [e['key'] for e in cluster]
     await write(
         """
         MERGE (n:AggEntity {key: $agg_key})
-        ON CREATE SET n.name = $agg_name
+        ON CREATE SET n.name = $agg_name, n.layer=$layer
         WITH n
         UNWIND $child_entity_keys AS child_key
         MATCH (c:Entity {key: child_key})
@@ -196,6 +200,40 @@ async def create_aggregate_entity(agg_entity, children_entity_keys):
         {
             "agg_key": agg_entity['key'],
             "agg_name": agg_entity['name'],
-            "child_entity_keys" : children_entity_keys
+            "child_entity_keys" : children_entity_keys,
+            "layer": layer
         }
+    )
+
+async def create_inter_cluster_relation(agg_A:AggEntity, agg_B:AggEntity, rel_desc:str, layer:int) -> None:
+    """
+    Create a new relation between aggregate nodes A and B, provided a description property
+    """
+    new_r_key = f"{agg_A['key']}__{agg_B['key']}"
+
+    await write(
+        """
+        MERGE (a:AggEntity {key: $a_key})-[r:AggRelation {key: $r_key}]->(b:AggEntity {key: $b_key})
+        ON CREATE SET r.desc = $r_desc, r.layer = $layer
+        """,
+        {
+            "a_key": agg_A['key'],
+            "b_key": agg_B['key'],
+            "r_key": new_r_key,
+            "r_desc": rel_desc,
+            "layer": layer
+        }
+    )
+
+async def set_root_entities(entity_keys:list[str]) -> None:
+    """
+    Add the :Root label to the given entities
+    """
+
+    await write(
+        """
+        UNWIND $root_keys as k
+        MATCH (n:AggEntity {key: k})
+        SET n:Root
+        """
     )
