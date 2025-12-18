@@ -163,6 +163,23 @@ async def get_intra_cluster_relations(cluster):
     )
     return resp
 
+async def get_inter_cluster_relations(cluster_A, cluster_B):
+    """
+    Get relations across clusters A and B (relations between entities in A and B)
+    """
+    raise NotImplementedError()
+    entities_A = []
+    entities_B = []
+
+    resp = await read(
+        """
+        MATCH (a:Entity)-[r:Relation]-(b:Entity)
+        WHERE a.key IN $a_keys AND b.key IN $b_keys
+        RETURN r as inter_relations
+        """
+    )
+    return resp
+
 async def create_aggregate_entity(agg_entity, children_entity_keys):
     """
     (LeanRAG) create a new aggregate entity
