@@ -2,7 +2,7 @@ from hashlib import blake2b
 from .models import Chunk, HexID, DocData
 import re
 from itertools import islice
-
+from tokenizers import Tokenizer as _Tokenizer
 
 def normalize_from_name(name:str) -> str:
     """
@@ -70,3 +70,14 @@ def batched(iterable, size):
         if not batch:
             break
         yield batch
+
+class Tokenizer:
+    model = "gpt2"
+    _tokenizer:_Tokenizer = None
+
+    @classmethod
+    def encode(self, input:str):
+        if not Tokenizer._tokenizer:
+            Tokenizer._tokenizer = _Tokenizer.from_pretrained(Tokenizer.model)
+
+        return Tokenizer._tokenizer.encode(input)
