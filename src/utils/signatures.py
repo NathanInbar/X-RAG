@@ -1,6 +1,6 @@
 import dspy
 from asyncio import Semaphore, Lock
-from utils.models import Finding, AggEntity, EntityRelation
+from utils.models import Finding, AggEntity, IntrClusterRel
 from utils import normalize_from_name
 
 AGGREGATION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
@@ -124,30 +124,27 @@ WTO External Contributors played an advisory role to the WTO Flagship Reports ag
     sub_entity_relationships:list[str] = dspy.InputField(desc="The sub-entity relationships between entities in aggregate A and B")
     summary:str = dspy.OutputField(desc="The high-level, abstract summary sentence describing how two named aggregations are connected")
 PRED_CREATE_AGG_REL = dspy.Predict(_CreateAggregateRel)
-async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_cluster_relations=list[EntityRelation], sem:Semaphore=None) -> str:
+async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_cluster_relations=list[IntrClusterRel], sem:Semaphore=None) -> str:
     """ Using 2 aggregate entities, and a list of the inter-cluster relations, create a summary for the relation between aggregate A and B"""
 
     # form prompt-compatible string list from inter cluster relations
-    sub_e_rel = [f""]
-    raise NotImplementedError("implement sub_e_rel")
+    sub_e_rel = [f"{icr['source_entity']}→{icr['target_entity']}→{icr['relation']}" for icr in inter_cluster_relations]
+    if(sem):
+        await sem.acquire()
     try:
-        if(sem):
-            await sem.acquire()
-
-        #FIXME: await module level predictor .acall
-        pred=await dspy.predict(_CreateAggregateRel(
-            aggregate_a_name = agg_a["name"],
-            aggregate_a_desc = agg_a["description"],
-            aggregate_b_name = agg_b["name"],
-            aggregate_b_desc = agg_b["description"],
-            sub_entity_relationships = sub_e_rel
-        ))
-
+        with dspy.context(lm=_lm_aggregator):
+            pred=await PRED_CREATE_AGG_REL.acall(
+                aggregate_a_name = agg_a["name"],
+                aggregate_a_desc = agg_a["description"],
+                aggregate_b_name = agg_b["name"],
+                aggregate_b_desc = agg_b["description"],
+                sub_entity_relationships = sub_e_rel
+            )
+        if not pred: raise RuntimeError("empty prediction")
+    except NotImplementedError: # temp skip error silencing (throw exceptions)
+        return None
+    finally:
         if(sem):
             sem.release()
-
-        if not pred: raise RuntimeError("empty prediction")
-    except Exception:
-        return None
     
     return pred['summary']
