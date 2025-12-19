@@ -1,10 +1,10 @@
 import sys
+import json
 import asyncio
 from pathlib import Path
 from math import log
 from itertools import combinations
 import logging
-
 import numpy as np
 import litellm
 from tqdm import tqdm
@@ -25,13 +25,14 @@ DATASET_FILE = CWD / "result.json"
 embed_cache_file = CWD / "embed_cache.json"
 
 EMBED_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
+G0_EMBEDDINGS_FILE = CWD / "g0_embeddings.json"
 ENTITY_BATCH_SIZE = 32
 MAX_PARALLEL_EMBED = 8
 
 CLUSTER_SIZE = 20
 
-DEBUG_LAYER_START = 1
-DEBUG_LAYER_STOP = 2
+DEBUG_LAYER_START = 0
+DEBUG_LAYER_STOP = 1
 
 type AggEntityKey = str
 
@@ -67,7 +68,7 @@ async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, 
     await acc.extend(rows)
     await pbar.update(len(batch))
 
-async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, max_parallel:int, pbar:AsyncProgressBar ) -> AsyncList[EntityDescEmbed]:
+async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, max_parallel:int, layer:int, pbar:AsyncProgressBar) -> AsyncList[EntityDescEmbed]:
     """
     embed all entity descriptions in batches
     """
@@ -87,6 +88,11 @@ async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, m
     for r in results:
         if r:
             logger.error(f"embed task failure: {r}")
+
+    if layer == 0:
+        # write out the entity embeddings (used in retrieval step)
+        with open(G0_EMBEDDINGS_FILE, "w") as fp:
+            json.dump(acc.get_list(), fp)
 
     return acc
 
@@ -181,7 +187,7 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     logger.debug(f"\tgenerating embeddings for {n_entities} entity descriptions ...")
     # 2. get embeddings
     pbar = AsyncProgressBar(total=n_entities, desc="Entity description embeddings")
-    entity_desc_embeds:AsyncList[EntityDescEmbed] = await embed_all_entity_descriptions(entities, ENTITY_BATCH_SIZE, MAX_PARALLEL_EMBED, pbar=pbar)
+    entity_desc_embeds:AsyncList[EntityDescEmbed] = await embed_all_entity_descriptions(entities, ENTITY_BATCH_SIZE, MAX_PARALLEL_EMBED, layer, pbar=pbar)
     await pbar.close()
 
     logger.debug(f"\tsuccessfully created {len(entity_desc_embeds)} embeddings!")

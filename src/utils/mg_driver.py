@@ -233,13 +233,15 @@ async def create_inter_cluster_relation(agg_A:AggEntity, agg_B:AggEntity, rel_de
 
 async def set_root_entities(root_layer:int) -> None:
     """
-    Add the :Root label to the given entities
+    Add the :Root entity, set all entities in the last layer as children of the root.
     """
 
     await write(
         """
+        MERGE (t:Root {key: "root"})
+        WITH t
         MATCH (n:AggEntity {layer: $root_layer})
-        SET n:Root
+        MERGE (n)-[:IS_CHILD_OF]->(t)
         """,
         {
             "root_layer": root_layer
@@ -255,3 +257,17 @@ async def count_entities() -> int:
         """
     )
     return resp[0]['count']
+
+
+async def get_ancestor_chain(entity_key:str):
+    """ Finds the ancestor chain from the base entity to the Root """
+    resp = await read(
+        """
+        MATCH p = (:Entity {key: $e_key})-[:IS_CHILD_OF*]->(:Root)
+        RETURN p;
+        """, {"e_key": entity_key}
+    )
+    resp = resp[0]['p']
+    resp = [e for e in resp if type(e) != str and e['key'] != 'root']
+    resp = sorted(resp, key=lambda e: e['layer'])
+    return resp
