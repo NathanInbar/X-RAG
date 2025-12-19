@@ -55,5 +55,5 @@ if __name__ == "__main__":
     for file_path in tqdm(source_dir.iterdir(),desc="Dataset PDF extraction"):
         extracted_source:MINELike = extract_pdf(source_pdf=file_path)
         # write out to json in output_dir
-        with open(output_dir/f"{file_path.stem}.json", "w") as fp:
+        with open(output_dir/f"{file_path.stem}.json", "w", encoding="utf-8") as fp:
             json.dump(extracted_source, fp, ensure_ascii=False, indent=4)
