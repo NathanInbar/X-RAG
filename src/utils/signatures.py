@@ -70,7 +70,7 @@ async def generate_aggregate_node(
     agg_entity = AggEntity(
         key=normalize_from_name(pred["entity_name"]),
         name=pred["entity_name"],
-        description=pred["entity_description"],
+        desc=pred["entity_description"],
     )
     return (agg_entity, pred["findings"])
 
@@ -135,9 +135,9 @@ async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_clu
         with dspy.context(lm=_lm_aggregator):
             pred=await PRED_CREATE_AGG_REL.acall(
                 aggregate_a_name = agg_a["name"],
-                aggregate_a_desc = agg_a["description"],
+                aggregate_a_desc = agg_a["desc"],
                 aggregate_b_name = agg_b["name"],
-                aggregate_b_desc = agg_b["description"],
+                aggregate_b_desc = agg_b["desc"],
                 sub_entity_relationships = sub_e_rel
             )
         if not pred: raise RuntimeError("empty prediction")

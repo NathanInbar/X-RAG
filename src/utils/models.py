@@ -41,7 +41,7 @@ type Cluster = list[Entity]
 class AggEntity(TypedDict):
     key:str
     name:str
-    description:str
+    desc:str
 
 class EntityRelation(TypedDict):
     key:str
