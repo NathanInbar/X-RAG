@@ -1,9 +1,9 @@
 import sys
-import json
 import asyncio
 from pathlib import Path
 from math import log
 from itertools import combinations
+import logging
 
 import numpy as np
 import litellm
@@ -20,7 +20,7 @@ from utils.models import *
 
 #TODO: generate + add entity 'type' property
 
-CWD = Path(__name__).resolve().parent
+CWD = Path(__file__).resolve().parent
 DATASET_FILE = CWD / "result.json"
 embed_cache_file = CWD / "embed_cache.json"
 
@@ -30,6 +30,7 @@ MAX_PARALLEL_EMBED = 8
 
 CLUSTER_SIZE = 20
 
+DEBUG_LAYER_START = 1
 DEBUG_LAYER_STOP = 2
 
 type AggEntityKey = str
@@ -43,7 +44,17 @@ acm_lock = asyncio.Lock()
 
 root_layer:int = -1
 
-async def batch_embed_descriptions(batch:list[Entity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
+# LOGGER
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(levelname)s - %(message)s",
+    force=True
+)
+
+logger = logging.getLogger("leanrag")
+logger.setLevel(logging.DEBUG)
+
+async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
     async with embed_sem:
         resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
@@ -60,16 +71,11 @@ async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, m
     """
     embed all entity descriptions in batches
     """
-    
-    acc = AsyncList()
+    # logger.debug("ENTITIES TO EMBED:\n")
+    # logger.debug(str(entities))
+    # raise RuntimeError()
 
-    # TODO: re-implement embed caching so it works for multiple layers
-    # if USE_EMBED_CACHE and embed_cache_file.is_file():
-    #     with open(embed_cache_file, "r") as cf:
-    #         data = json.load(cf)
-    #     await acc.extend(data)
-    #     await pbar.update(len(entities))
-    #     return acc
+    acc = AsyncList()
 
     embed_sem = asyncio.Semaphore(max_parallel)
 
@@ -78,14 +84,9 @@ async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, m
         batch_embed_tasks.append(batch_embed_descriptions(batch, acc, embed_sem, pbar))
 
     results = await asyncio.gather(*batch_embed_tasks, return_exceptions=True)
-
-    # cache acc
-    # with open(embed_cache_file, "w") as cf:
-    #     json.dump(acc.get_list(),cf)
-
-    print(f"created embeddings for entity descriptions for #{len(entities)} entities")
-    print(f"results:\n{results}")
-
+    for r in results:
+        if r:
+            logger.error(f"embed task failure: {r}")
 
     return acc
 
@@ -151,47 +152,62 @@ async def build_hierarchy(max_depth:int):
     agg_clst_map = {}
     acm_lock = asyncio.Lock()
 
-    await aggregate_layer_recursive(1, max_depth)
+    await aggregate_layer_recursive(DEBUG_LAYER_START, max_depth)
 
 async def aggregate_layer_recursive(layer:int, max_depth:int):
     global root_layer
-
+    logger.debug(f"Aggregating Layer {layer} ...")
     #debug
     if DEBUG_LAYER_STOP > 0 and layer == DEBUG_LAYER_STOP:
         root_layer = layer
+        logger.debug(f"\tSTOP!: stopped at this layer due to DEBUG_LAYER_STOP flag")
         return
 
     if layer > max_depth:
         root_layer = layer
+        logger.debug(f"\tSTOP!: stopped at this layer, hit max depth of {max_depth}")
         return
     
     # 1. collect all entities in the layer
-    entities:list[Entity] = await mg_driver.get_entities_for_layer(layer) # list of 620 entities
+    entities:list[Entity] = await mg_driver.get_entities_for_layer(layer)
     n_entities:int = len(entities)
+    logger.debug(f"\tcollected {n_entities} entites in layer.")
 
     if n_entities <= 2:
         root_layer = layer
+        logger.debug(f"\tSTOP!: stopped at this layer, not enough entities (<= 2)")
         return
 
+    logger.debug(f"\tgenerating embeddings for {n_entities} entity descriptions ...")
     # 2. get embeddings
     pbar = AsyncProgressBar(total=n_entities, desc="Entity description embeddings")
     entity_desc_embeds:AsyncList[EntityDescEmbed] = await embed_all_entity_descriptions(entities, ENTITY_BATCH_SIZE, MAX_PARALLEL_EMBED, pbar=pbar)
     await pbar.close()
 
+    logger.debug(f"\tsuccessfully created {len(entity_desc_embeds)} embeddings!")
+    if (len(entity_desc_embeds) != n_entities):
+        raise RuntimeError(f"layer {layer}: Tried to embed {n_entities} entity descriptions, but got {len(entity_desc_embeds)} embeddings back!")
+
     # 3. get embeddings as numpy array, reduce dimesions with umap
     raw_embeds_arr = np.asarray([e["desc_embed"] for e in entity_desc_embeds], dtype=np.float32)
+    _shape_before = raw_embeds_arr.shape
     raw_embeds_arr = reduce_embeddings(raw_embeds_arr, reduction_dim=min(2, n_entities-2))
+    logger.debug(f"\treduced embedding shape from {_shape_before} -> {raw_embeds_arr.shape}")
 
     # 4. Calculate num of paritions for this layer
+    logger.debug(f"\tcalculating number of partitions with heuristic and BCI ...")
     heuristic = n_entities // CLUSTER_SIZE
     bci_rec = get_optimal_clusters_from_embeddings(raw_embeds_arr)
     n_components = max(heuristic, bci_rec)
+    logger.debug(f"\theuristic: {heuristic}, BCI: {bci_rec}. Chose n_components = ({n_components})")
 
     if n_components <= 4:
         root_layer = layer
+        logger.debug(f"\tSTOP!: stopped because number of partitions is small (<=4)")
         return
 
     # 5. Partition layer into clusters
+    logger.debug(f"\tfitting embeddings into GMM with n_components={n_components} ...")
     gmm:GaussianMixture = GaussianMixture(
         n_components= n_components,
         covariance_type="full",
@@ -205,19 +221,25 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     clusters:dict[int, Cluster] = {k:[] for k in range(n_components)}
     for i, k in enumerate(labels):
         clusters[int(k)].append(entities[i])
+    logger.debug(f"\tsuccessfully built {len(clusters.keys())} clusters")
 
     # 6. Create aggregate nodes
+    logger.debug(f"\tcreating aggregates nodes from clusters:")
     layer_aggregates:AsyncList = AsyncList()
-    _aggregation_tasks = [_aggregate_task(cluster, layer_aggregates, pbar) for _,cluster in clusters.items()]
-    pbar = AsyncProgressBar(total=len(clusters.keys()), desc=f"agg tasks (layer {layer})")
+    pbar = AsyncProgressBar(total=len(clusters), desc=f"agg tasks (layer {layer})")
+    _aggregation_tasks = [_aggregate_task(cluster, layer_aggregates, pbar) for cluster in clusters.values()]
+    logger.debug(f"\rrunning {len(_aggregation_tasks)} aggregation tasks ...")
     await asyncio.gather(*_aggregation_tasks, return_exceptions=True)
+    await pbar.close()
+    logger.debug(f"\tsuccessfully built data for {len(layer_aggregates)} unique aggregate entities! creating nodes in memgraph ...")
 
     for agg in layer_aggregates:
         await mg_driver.create_aggregate_entity(agg, agg_clst_map[agg['key']], layer+1)
+    logger.debug("\tsuccesffuly created aggregate entity nodes")
 
     # 7. Create inter-cluster relations
     allowed_tokens = ( max_depth - layer ) * 40 * 2
-
+    logger.debug(f"\tcreating inter-aggregate relations. (allowed tokens: {allowed_tokens})")
     for aggJ, aggK in tqdm(combinations(layer_aggregates, 2), desc="aggregate entity inter-relations"):
         
         inter_cluster_rel:list[IntrClusterRel] = await mg_driver.get_inter_cluster_relations(agg_clst_map[aggJ['key']], agg_clst_map[aggK['key']])
@@ -233,6 +255,7 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
             icr_desc:str = icr_desc_fallback_concat(inter_cluster_rel)
 
         await mg_driver.create_inter_cluster_relation(aggJ, aggK, icr_desc, layer+1)
+    logger.debug(f"\tsuccessfully created inter-aggregate relations! (Done with this layer)")
 
     await aggregate_layer_recursive(layer+1,max_depth)
 
@@ -244,7 +267,7 @@ async def main():
     # build the graph with recursive hierarchical clustering:
     await build_hierarchy(max_depth)
 
-    print(f"root layer: {root_layer}")
+    logger.debug(f"ROOT LAYER: {root_layer}")
     await mg_driver.set_root_entities(root_layer)
 
 if __name__ == "__main__":

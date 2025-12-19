@@ -190,16 +190,17 @@ async def create_aggregate_entity(agg_entity:AggEntity, cluster:Cluster, layer:i
     children_entity_keys:list[str] = [e['key'] for e in cluster]
     await write(
         """
-        MERGE (n:AggEntity {key: $agg_key})
-        ON CREATE SET n.name = $agg_name, n.layer=$layer
+        MERGE (n:AggEntity {key: $agg_key, layer: $layer})
+        ON CREATE SET n.name = $agg_name, n.desc = $desc
         WITH n
         UNWIND $child_entity_keys AS child_key
-        MATCH (c:Entity {key: child_key})
+        MATCH (c:Entity|AggEntity {key: child_key, layer: $layer-1})
         MERGE (c)-[:IS_CHILD_OF]->(n)
         """,
         {
             "agg_key": agg_entity['key'],
             "agg_name": agg_entity['name'],
+            "desc": agg_entity['desc'],
             "child_entity_keys" : children_entity_keys,
             "layer": layer
         }
