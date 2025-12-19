@@ -26,7 +26,7 @@ class MINELike(TypedDict):
     answers:list[str]
 
 def extract_pdf(source_pdf:Path) -> MINELike:
-    extracted_pdf:MINELike = { "essay":f"```TITLE: {source_pdf.name}```\n\n{extract_text(source_pdf)}", "answers": []}
+    extracted_pdf:MINELike = { "essay":f"```TITLE: {source_pdf.stem}```\n\n{extract_text(source_pdf)}", "answers": []}
     return extracted_pdf
 
 if __name__ == "__main__":
