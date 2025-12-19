@@ -33,14 +33,6 @@ if __name__ == "__main__":
     # base directory for relative paths
     CWD = Path(__file__).resolve().parent
 
-    secrets = CWD / "secrets.env"
-
-    if not secrets.is_file():
-        raise ValueError(f"secrets file at '{secrets}' does not exist")
-
-    from dotenv import load_dotenv
-    load_dotenv(secrets)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-dir", type=Path, default=Path("dataset_pdfs"))
     parser.add_argument("--output-dir", type=Path, default=Path("dataset_output"))
