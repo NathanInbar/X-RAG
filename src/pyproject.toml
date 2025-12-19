@@ -22,7 +22,8 @@ utils = [
 ]
 leanrag = [
     "yake",
-    "scikit-learn"
+    "scikit-learn",
+    "umap-learn"
 ]
 
 [build-system]

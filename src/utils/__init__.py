@@ -3,6 +3,9 @@ from .models import Chunk, HexID, DocData
 import re
 from itertools import islice
 from tokenizers import Tokenizer as _Tokenizer
+from typing import Sequence
+import numpy as np
+from sklearn.mixture import GaussianMixture
 
 def normalize_from_name(name:str) -> str:
     """
@@ -81,3 +84,59 @@ class Tokenizer:
             Tokenizer._tokenizer = _Tokenizer.from_pretrained(Tokenizer.model)
 
         return Tokenizer._tokenizer.encode(input)
+    
+
+
+from typing import Sequence
+import numpy as np
+from sklearn.mixture import GaussianMixture
+import umap
+
+def reduce_embeddings(embeddings:np.ndarray, reduction_dim=2, random_state=0):
+    # LeanRAG reduces dimensionality with UMAP before clustering.
+    target_dim = min(reduction_dim, embeddings.shape[0] - 2) if embeddings.shape[0] > 2 else 1
+    reducer = umap.UMAP(
+        n_components=target_dim,
+        n_neighbors=15,
+        metric="cosine",
+        random_state=random_state,
+    )
+    return reducer.fit_transform(embeddings)
+
+def get_optimal_clusters_from_embeddings(
+    reduced_embeddings: np.ndarray,
+    *,
+    max_clusters: int = 50,
+    rel_tol: float = 1e-3,
+    random_state: int = 0,
+) -> int:
+    """
+    LeanRAG-style cluster-count selection; desc_embeddings is a list of per-entity
+    description vectors (e.g., [{'key': ..., 'desc_embed': [...]}, ...] →pass only
+    the desc_embed values here).
+
+    Returns the number of clusters to request from the GMM.
+    """
+
+
+    capped_max = min(len(reduced_embeddings), max_clusters)
+    bics = []
+    prev_bic = float("inf")
+
+    for n_components in range(1, capped_max + 1):
+        gm = GaussianMixture(
+            n_components=n_components,
+            random_state=random_state,
+            n_init=5,
+            init_params="k-means++",
+        )
+        gm.fit(reduced_embeddings)
+        bic = gm.bic(reduced_embeddings)
+        bics.append(bic)
+
+        if abs(prev_bic - bic) / (abs(prev_bic) + 1e-12) < rel_tol:
+            break
+        prev_bic = bic
+
+    best_idx = int(np.argmin(bics))
+    return best_idx + 1  # because we started counting at 1

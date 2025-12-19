@@ -230,17 +230,19 @@ async def create_inter_cluster_relation(agg_A:AggEntity, agg_B:AggEntity, rel_de
     if len(res) == 0:
         raise RuntimeError(f"Inter-cluster relation cypher failure:\n\t Likely couldnt match an AggEntity '{agg_A['key']}' and '{agg_B['key']}'")
 
-async def set_root_entities(entity_keys:list[str]) -> None:
+async def set_root_entities(root_layer:int) -> None:
     """
     Add the :Root label to the given entities
     """
 
     await write(
         """
-        UNWIND $root_keys as k
-        MATCH (n:AggEntity {key: k})
+        MATCH (n:AggEntity {layer: $root_layer})
         SET n:Root
-        """
+        """,
+        {
+            "root_layer": root_layer
+        }
     )
 
 async def count_entities() -> int:
