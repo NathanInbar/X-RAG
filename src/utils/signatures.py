@@ -178,7 +178,7 @@ Response Format: Style the response in markdown.
 
 PRED_CREATE_AUG_RESPONSE = dspy.Predict(_AugmentedResponse)
 
-async def generate_augmented_response(query:str,base_entity_info, agg_entity_info, reasoning_path_info, relevant_chunk_texts, sem:Semaphore) -> str:
+async def generate_augmented_response(query:str,base_entity_info, agg_entity_info, reasoning_path_info, relevant_chunk_texts) -> str:
     
     # convert to string tables:
     bei_string, aei_string, rpi_string = [],[],[]
@@ -196,8 +196,6 @@ async def generate_augmented_response(query:str,base_entity_info, agg_entity_inf
         rpi_string.append(row)
     rpi_string = "\n".join(rpi_string)
 
-    if(sem):
-        await sem.acquire()
     try:
         with dspy.context(lm=_lm_responder):
             pred = await PRED_CREATE_AUG_RESPONSE.acall(
@@ -209,7 +207,5 @@ async def generate_augmented_response(query:str,base_entity_info, agg_entity_inf
             )
     except NotImplementedError: # temp: let exceptions raise
         return None 
-    finally:
-        if(sem):
-            await sem.release()
+
     return pred['response']
