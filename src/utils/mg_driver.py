@@ -239,6 +239,7 @@ async def set_root_entities(root_layer:int) -> None:
     await write(
         """
         MERGE (t:Root {key: "root"})
+        ON CREATE SET t.layer = $root_layer+1
         WITH t
         MATCH (n:AggEntity {layer: $root_layer})
         MERGE (n)-[:IS_CHILD_OF]->(t)
@@ -268,6 +269,64 @@ async def get_ancestor_chain(entity_key:str):
         """, {"e_key": entity_key}
     )
     resp = resp[0]['p']
-    resp = [e for e in resp if type(e) != str and e['key'] != 'root']
+    resp = [e for e in resp if type(e) != str]
     resp = sorted(resp, key=lambda e: e['layer'])
     return resp
+
+async def get_lca_path(a_key:str, b_key:str, lca_key:str):
+    """Finds LCA path from a->...->lca<-...<-b"""
+    resp = await read(
+        """
+        MATCH p=((a:Entity {key: $a_key})-[:IS_CHILD_OF*]->(:AggEntity|Root {key: $lca_key})<-[:IS_CHILD_OF*]-(:Entity {key: $b_key}))
+        RETURN p
+        """,
+        {
+            "a_key": a_key,
+            "b_key": b_key,
+            "lca_key": lca_key
+        }
+    )
+    resp = resp[0]['p']
+    resp = [e for e in resp if type(e) != str and e['key'] != 'root']
+    return resp
+
+async def get_intra_lca_path_links(a_key:str, b_key:str, lca_key:str):
+    """Finds all links between nodes in an LCA path from a->...->lca<-...<-b"""
+    resp = await read(
+        """
+        MATCH p=((a:Entity {key: $a_key})-[:IS_CHILD_OF*]->(:AggEntity|Root {key: $lca_key})<-[:IS_CHILD_OF*]-(:Entity {key: $b_key}))
+        WITH nodes(p) AS ns
+        UNWIND ns AS a
+        MATCH (a)-[r:Relation|AggRelation]-(b)
+        WHERE b IN ns AND a.key < b.key
+        RETURN DISTINCT a, r.key AS r_key, r.desc AS r_desc, b
+        """,
+        {
+            "a_key": a_key,
+            "b_key": b_key,
+            "lca_key": lca_key
+        }
+    )
+    return resp
+
+async def get_ranked_provenance_for_entitys(entity_keys:list[str]):
+    """Get source chunk ids for a list of entities ranked by # of occurences"""
+
+    resp = await read(
+        """
+        MATCH (a:Entity)
+        WHERE a.key in $entity_keys
+        MATCH (a)-[r:Relation]-(b)
+        WITH DISTINCT r
+        UNWIND coalesce(r.source_chunk_ids, []) AS sc_id
+        WITH sc_id, count(*) AS occurences
+        ORDER BY occurences DESC
+        RETURN collect({chunk_id: sc_id, occurences: occurences}) AS ranked_chunks
+        """,
+        {
+            "entity_keys": entity_keys,
+        }
+    )
+    if resp:
+        return resp[0]['ranked_chunks']
+    return None

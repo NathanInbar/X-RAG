@@ -4,8 +4,10 @@ from utils.models import Finding, AggEntity, IntrClusterRel
 from utils import normalize_from_name
 
 AGGREGATION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
+RESPONSE_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
 
 _lm_aggregator= dspy.LM(model = AGGREGATION_MODEL)
+_lm_responder = dspy.LM(model = RESPONSE_MODEL)
 
 class _CreateAggregateNode(dspy.Signature):
     """
@@ -123,7 +125,9 @@ WTO External Contributors played an advisory role to the WTO Flagship Reports ag
     aggregate_b_desc:str = dspy.InputField(desc="Description of Aggregate B")
     sub_entity_relationships:list[str] = dspy.InputField(desc="The sub-entity relationships between entities in aggregate A and B")
     summary:str = dspy.OutputField(desc="The high-level, abstract summary sentence describing how two named aggregations are connected")
+
 PRED_CREATE_AGG_REL = dspy.Predict(_CreateAggregateRel)
+
 async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_cluster_relations=list[IntrClusterRel], sem:Semaphore=None) -> str:
     """ Using 2 aggregate entities, and a list of the inter-cluster relations, create a summary for the relation between aggregate A and B"""
 
@@ -148,3 +152,48 @@ async def generate_aggregate_rel_desc(agg_a:AggEntity,agg_b:AggEntity, inter_clu
             sem.release()
     
     return pred['summary']
+
+
+class _AugmentedResponse(dspy.Signature):
+    """
+# Role
+You are a helpful assistant responding to questions about data in the tables provided.
+
+## Goal
+Generate a response of the target length and format that responds to the user's question, summarizing all information in the input data tables appropriate for the response length and format, and incorporating any relevant general knowledge.
+If you don't know the answer, just say so. Do not make anything up.
+Do not include information where the supporting evidence for it is not provided.
+Add sections and commentary to the response as appropriate for the length and format.
+
+## Target Length and Response Format
+Target Lenth: Multiple Paragraphs
+Response Format: Style the response in markdown.
+    """
+    user_question = dspy.InputField()
+    base_entity_information = dspy.InputField()
+    aggregate_entity_information = dspy.InputField()
+    reasoning_path_information = dspy.InputField()
+    relevant_chunks = dspy.InputField()
+    response = dspy.OutputField()
+
+PRED_CREATE_AUG_RESPONSE = dspy.Predict(_AugmentedResponse)
+
+async def generate_augmented_response(query:str,base_entity_info, agg_entity_info, reasoning_path_info, relevant_chunk_texts, sem:Semaphore) -> str:
+    
+    if(sem):
+        await sem.acquire()
+    try:
+        with dspy.context(lm=_lm_responder):
+            pred = await PRED_CREATE_AUG_RESPONSE.acall(
+                user_question=query,
+                base_entity_information=base_entity_info,
+                aggregate_entity_information=agg_entity_info,
+                reasoning_path_information=reasoning_path_info,
+                relevant_chunks = relevant_chunk_texts
+            )
+    except NotImplementedError: # temp: let exceptions raise
+        return None 
+    finally:
+        if(sem):
+            await sem.release()
+    return pred['response']
