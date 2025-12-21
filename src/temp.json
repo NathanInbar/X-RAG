@@ -1,0 +1,22 @@
+{"name": "foo-rag", "result": [
+{
+  "my_rand": 2,
+  "time": "b'\\xaa\\xb5u\\x1e\\x06\\xc9d\\xd6'"
+},
+{
+  "my_rand": 5,
+  "time": "b'\\xc7\\xfem\\xaa\\x805\\x94\\xc9'"
+},
+{
+  "my_rand": 8,
+  "time": "b'7\\xc0\\x8b\\x0f\\xb4\\x8az\\x00'"
+},
+{
+  "my_rand": 5,
+  "time": "b'B\\xbe\\xc6M\\xb6\\xb2C\\x9b'"
+},
+{
+  "my_rand": 20,
+  "time": "b'\\xfa\\xfd\\xff\\xff\\x02`\\xf3B'"
+}
+]}

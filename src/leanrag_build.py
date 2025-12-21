@@ -31,8 +31,8 @@ MAX_PARALLEL_EMBED = 8
 
 CLUSTER_SIZE = 20
 
-DEBUG_LAYER_START = 0
-DEBUG_LAYER_STOP = 1
+# DEBUG_LAYER_START = 0
+# DEBUG_LAYER_STOP = 1
 
 type AggEntityKey = str
 
@@ -52,8 +52,8 @@ logging.basicConfig(
     force=True
 )
 
-logger = logging.getLogger("leanrag")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger("leanrag-build")
+logger.setLevel(logging.INFO)
 
 async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
@@ -158,16 +158,16 @@ async def build_hierarchy(max_depth:int):
     agg_clst_map = {}
     acm_lock = asyncio.Lock()
 
-    await aggregate_layer_recursive(DEBUG_LAYER_START, max_depth)
+    await aggregate_layer_recursive(0, max_depth)
 
 async def aggregate_layer_recursive(layer:int, max_depth:int):
     global root_layer
     logger.debug(f"Aggregating Layer {layer} ...")
     #debug
-    if DEBUG_LAYER_STOP > 0 and layer == DEBUG_LAYER_STOP:
-        root_layer = layer
-        logger.debug(f"\tSTOP!: stopped at this layer due to DEBUG_LAYER_STOP flag")
-        return
+    # if DEBUG_LAYER_STOP > 0 and layer == DEBUG_LAYER_STOP:
+    #     root_layer = layer
+    #     logger.debug(f"\tSTOP!: stopped at this layer due to DEBUG_LAYER_STOP flag")
+    #     return
 
     if layer > max_depth:
         root_layer = layer
@@ -207,26 +207,32 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     n_components = max(heuristic, bci_rec)
     logger.debug(f"\theuristic: {heuristic}, BCI: {bci_rec}. Chose n_components = ({n_components})")
 
-    if n_components <= 4:
+    if layer != 0 and n_components <= 4:
         root_layer = layer
         logger.debug(f"\tSTOP!: stopped because number of partitions is small (<=4)")
         return
 
-    # 5. Partition layer into clusters
-    logger.debug(f"\tfitting embeddings into GMM with n_components={n_components} ...")
-    gmm:GaussianMixture = GaussianMixture(
-        n_components= n_components,
-        covariance_type="full",
-        random_state=0,
-        n_init=5
-    )
-    gmm.fit(raw_embeds_arr)
-    responsibilities = gmm.predict_proba(raw_embeds_arr)
-    labels = responsibilities.argmax(axis=1)
+    clusters: dict[int, Cluster] = None
+    if layer == 0 and n_components <= 4:
+        # the base kg is too small to partition into multiple clusters. instead, treat full base kg as one cluster.
+        clusters = {0: entities}
+    else:
+        # 5. Partition layer into clusters
+        logger.debug(f"\tfitting embeddings into GMM with n_components={n_components} ...")
+        gmm:GaussianMixture = GaussianMixture(
+            n_components= n_components,
+            covariance_type="full",
+            random_state=0,
+            n_init=5
+        )
+        gmm.fit(raw_embeds_arr)
+        responsibilities = gmm.predict_proba(raw_embeds_arr)
+        labels = responsibilities.argmax(axis=1)
 
-    clusters:dict[int, Cluster] = {k:[] for k in range(n_components)}
-    for i, k in enumerate(labels):
-        clusters[int(k)].append(entities[i])
+        clusters:dict[int, Cluster] = {k:[] for k in range(n_components)}
+        for i, k in enumerate(labels):
+            clusters[int(k)].append(entities[i])
+
     logger.debug(f"\tsuccessfully built {len(clusters.keys())} clusters")
 
     # 6. Create aggregate nodes
@@ -244,6 +250,12 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     logger.debug("\tsuccesffuly created aggregate entity nodes")
 
     # 7. Create inter-cluster relations
+    if layer == 0 and n_components <= 4:
+        # no need for this step for the small-graph case
+        root_layer = layer+1
+        logger.debug(f"\tSTOP!: stopped because this graph was too small (created single aggregate)")
+        return
+    
     allowed_tokens = ( max_depth - layer ) * 40 * 2
     logger.debug(f"\tcreating inter-aggregate relations. (allowed tokens: {allowed_tokens})")
     for aggJ, aggK in tqdm(combinations(layer_aggregates, 2), desc="aggregate entity inter-relations"):
@@ -265,16 +277,21 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
 
     await aggregate_layer_recursive(layer+1,max_depth)
 
-async def main():
+async def build():
+    global root_layer
+    root_layer = -1
+
     await mg_driver.init()
     n_layer0_entities = await mg_driver.count_entities()
     max_depth = round(log(n_layer0_entities, CLUSTER_SIZE)) +1
+    logger.info(f"building leanrag kg (max depth = {max_depth})")
 
     # build the graph with recursive hierarchical clustering:
     await build_hierarchy(max_depth)
 
-    logger.debug(f"ROOT LAYER: {root_layer}")
     await mg_driver.set_root_entities(root_layer)
+    logger.info(f"leanrag kg built! ({root_layer} layers)")
+    return root_layer
 
 if __name__ == "__main__":
     sys.path.append(CWD)
@@ -286,4 +303,4 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv(secrets)
 
-    asyncio.run(main())
+    asyncio.run(build())

@@ -169,39 +169,22 @@ Add sections and commentary to the response as appropriate for the length and fo
 Target Lenth: Multiple Paragraphs
 Response Format: Style the response in markdown.
     """
-    user_question = dspy.InputField(desc="The users question")
-    base_entity_information = dspy.InputField(desc="A table listing the relevant base entities")
-    aggregate_entity_information = dspy.InputField(desc="a table listing the higher-level aggregated entities")
-    reasoning_path_information = dspy.InputField(desc="the reasoning of the supporting evidence")
-    relevant_chunks = dspy.InputField(desc="relevant segments from the original text")
-    response = dspy.OutputField(desc="the response to the users question")
+    user_question:str = dspy.InputField(desc="The users question")
+    base_entity_information:str = dspy.InputField(desc="A table listing the relevant base entities")
+    aggregate_entity_information:str = dspy.InputField(desc="a table listing the higher-level aggregated entities")
+    reasoning_path_information:str = dspy.InputField(desc="the reasoning of the supporting evidence")
+    relevant_chunks:str = dspy.InputField(desc="relevant segments from the original text")
+    response:str = dspy.OutputField(desc="the response to the users question")
 
 PRED_CREATE_AUG_RESPONSE = dspy.Predict(_AugmentedResponse)
 
-async def generate_augmented_response(query:str,base_entity_info, agg_entity_info, reasoning_path_info, relevant_chunk_texts) -> str:
-    
-    # convert to string tables:
-    bei_string, aei_string, rpi_string = [],[],[]
-    bei_string.append("entity name, parent, description")# header
-    for row in base_entity_info:
-        bei_string.append(f"{row[0], row[1], row[2]}")
-    bei_string = "\n".join(bei_string)
-
-    aei_string.append("entity name, entity description")# header
-    for row in agg_entity_info:
-        aei_string.append(f"{row[0], row[1]}")
-    aei_string = "\n".join(aei_string)
-
-    for row in reasoning_path_info:
-        rpi_string.append(row)
-    rpi_string = "\n".join(rpi_string)
-
+async def generate_augmented_response(query:str,base_entity_info:str, agg_entity_info:str, reasoning_path_info:str, relevant_chunk_texts:str) -> str:
     try:
         with dspy.context(lm=_lm_responder):
             pred = await PRED_CREATE_AUG_RESPONSE.acall(
                 user_question=query,
-                base_entity_information=bei_string,
-                aggregate_entity_information=aei_string,
+                base_entity_information=base_entity_info,
+                aggregate_entity_information=agg_entity_info,
                 reasoning_path_information=reasoning_path_info,
                 relevant_chunks = relevant_chunk_texts
             )

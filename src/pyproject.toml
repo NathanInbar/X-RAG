@@ -11,7 +11,8 @@ dependencies = [
     "wtpsplit[onnx-cpu]>=2.1.6",
     "wtpsplit[onnx-gpu]>=2.1.6",
     "python-dotenv",
-    "scikit-learn"
+    "scikit-learn",
+    "aiolimiter"
 ]
 
 [project.optional-dependencies]
