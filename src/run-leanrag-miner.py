@@ -112,69 +112,116 @@ def mean_median_query_time(result):
     median = times[len(times)//2]
     return mean, median
 
-async def miner_evaluate_individual_with_preprocess(name:str, miner: MINER):
+
+async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER"):
     paths = list(DATASET_DIRECTORY.iterdir())
-    result_file = results_dir/f"{name}.json"
+    result_file = results_dir / f"{name}.json"
+    tmp_file = result_file.with_suffix(result_file.suffix + ".tmp")
+
     print(f"Writing results file to '{result_file}'")
-    with open(result_file, "w") as fp:
-        fp.write('{"name": '+f'"{name}"'+ ', "result": [\n')
-    for i, p in enumerate(paths): 
-        if p.name != "A Day in the Life of an Astronaut.json": continue
+
+    # ---- load existing results (cache) ----
+    results_obj = {"name": name, "result": []}
+    if result_file.is_file():
+        try:
+            with open(result_file, "r") as fp:
+                loaded = json.load(fp)
+            # accept either full object {"name":..., "result":[...]} or a bare list (older attempts)
+            if isinstance(loaded, dict) and isinstance(loaded.get("result"), list):
+                results_obj = loaded
+                results_obj["name"] = name  # keep current run name
+            elif isinstance(loaded, list):
+                results_obj["result"] = loaded
+        except Exception:
+            pass
+
+    # consider a file "done" if we already have an entry for it that is not an error
+    done_files = {
+        r.get("filename")
+        for r in results_obj["result"]
+        if isinstance(r, dict) and r.get("filename") and ("error" not in r)
+    }
+
+    def _atomic_save():
+        # atomic-ish save (write tmp then replace)
+        with open(tmp_file, "w") as fp:
+            json.dump(results_obj, fp, indent=2, ensure_ascii=False)
+            fp.write("\n")
+        tmp_file.replace(result_file)
+
+    _atomic_save()
+
+    # ---- evaluation loop ----
+    for i, p in enumerate(paths):
+
+        # caching skip
+        if p.name in done_files:
+            print(f"SKIP (cached): {p.name} ({i+1}/{len(paths)})")
+            continue
+
         try:
             print(f"START EVAL: {p.name} ({i+1}/{len(paths)})")
 
-            # Load data 
+            # Load data
             with open(p, "r") as fp:
                 mine_data = json.load(fp)
 
-            # Creates pre-process data (chunks + g0 descriptions json files) - check if it exists already from prev runs
+            # Preprocess (only if missing)
             preprocessed_chunks = CWD / f"{p.stem}__chunks.json"
             preprocessed_descs = CWD / f"{p.stem}__g0_descriptions.json"
             if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
                 await process_dataset_file(p)
 
-            # Ingest text 
+            # Ingest
             print("Ingesting...")
             ingest_st = time.time()
             await miner.ingest(preprocessed_chunks, preprocessed_descs)
             await miner.pre_retrieve(p.name)
             ingest_en = time.time()
-            # Query and evaluate
+
+            # Query + evaluate
             print("Evaluating...")
             queries = []
             with dspy.context(lm=JUDGE_MODEL):
-                for j, a in enumerate(mine_data["answers"]):
-                    print(f"\rQuery {j+1}/{len(mine_data["answers"])}", end="")
+                answers = mine_data.get("answers", [])
+                for j, a in enumerate(answers):
+                    print(f"\rQuery {j+1}/{len(answers)}", end="")
                     q_st = time.time()
                     info = await miner.retrieve(a, preprocessed_chunks)
                     q_en = time.time()
                     contained = (await eval.acall(context=info, statement=a)).context_contains_statement
-                    queries.append({
-                        "query": a,
-                        "context": info,
-                        "contained": contained,
-                        "duration": q_en - q_st,
-                    })
+                    queries.append(
+                        {
+                            "query": a,
+                            "context": info,
+                            "contained": contained,
+                            "duration": q_en - q_st,
+                        }
+                    )
                 print("")
+
             result = {
                 "filename": p.name,
                 "ingest_duration": ingest_en - ingest_st,
                 "queries": queries,
             }
+
             await miner.reset()
+
         except Exception as e:
-            result = {"error": str(e)}
+            result = {"filename": p.name, "error": str(e)}
             print(f"ERROR: {str(e)}")
-            continue
-        finally:
-            with open (result_file, "a") as fp:
-                json.dump(result, fp)
-                if i==0 :#i < len(paths)-1
-                    fp.write(",")
-                fp.write("\n")
-            print(f"wrote result to {result_file}")
-    with open (result_file, "a") as fp:
-        fp.write("]}")
+            try:
+                await miner.reset()
+            except Exception:
+                pass
+
+        # persist + update cache
+        results_obj["result"].append(result)
+        if "error" not in result:
+            done_files.add(p.name)
+        _atomic_save()
+        print(f"wrote result to {result_file}")
 
 async def evaluate(
     eval_itms: list[callable],
@@ -196,40 +243,75 @@ def show_results():
     errors = []
     table = PrettyTable()
     table.field_names = [
-        "Name", 
-        "Score", 
-        "Context Length", 
+        "Name",
+        "Score",
+        "Context Length",
         "Conciseness",
-        "Query Duration (mean)", 
+        "Query Duration (mean)",
         "Query Duration (median)",
     ]
+
     results_dir.mkdir(exist_ok=True)
+
     for f in results_dir.iterdir():
+        if not f.is_file() or f.suffix.lower() != ".json":
+            continue
+
         print(f"Reading {f} ...")
-        with open(f, "r", encoding="utf-8") as fp:
-            data = json.load(fp)
-        
-        results:list = data["result"]
+        try:
+            with open(f, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+        except Exception as e:
+            errors.append({"filename": f.name, "error": f"failed to load results json: {e}"})
+            continue
+
+        # tolerate either {"name":..., "result":[...]} or a bare list (older files)
+        if isinstance(data, dict):
+            name = data.get("name", f.stem)
+            results = data.get("result", [])
+        elif isinstance(data, list):
+            name = f.stem
+            results = data
+        else:
+            errors.append({"filename": f.name, "error": f"unexpected json root type: {type(data)}"})
+            continue
+
+        if not isinstance(results, list):
+            errors.append({"filename": f.name, "error": "missing/invalid 'result' list"})
+            continue
+
         r_no_err = []
         for r in results:
-            if 'error' in r:
+            if not isinstance(r, dict):
+                errors.append({"filename": f.name, "error": f"non-dict result entry: {type(r)}"})
+                continue
+            if "error" in r:
                 errors.append(r)
-            else: r_no_err.append(r)
+            else:
+                r_no_err.append(r)
 
         score, count = score_count(r_no_err)
         r_conciseness = conciseness(r_no_err)
         mean, median = mean_median_query_time(r_no_err)
+
+        # avoid division by zero
+        pct = (score / count * 100.0) if count else 0.0
+        concise = r_conciseness if (r_conciseness and r_conciseness > 0) else 0.0
+        efficiency = (pct / concise) if concise else 0.0
+
         table.add_row([
-            data["name"], 
-            f"{score/count*100:.2f}% ({score}/{count})", 
-            f"{r_conciseness:.2f}",
-            f"{score/count*100/r_conciseness:.2f}",
-            f"{mean:.2f}s",
-            f"{median:.2f}s",
+            name,
+            f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
+            f"{concise:.2f}" if concise else "n/a",
+            f"{efficiency:.2f}" if efficiency else "n/a",
+            f"{mean:.2f}s" if mean is not None else "n/a",
+            f"{median:.2f}s" if median is not None else "n/a",
         ])
+
     print(table)
-    print("\nERORRS:")
+    print("\nERRORS:")
     print(errors)
+
     
 if __name__ == "__main__":
     eval_routine = evaluate(
