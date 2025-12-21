@@ -119,7 +119,6 @@ async def miner_evaluate_individual_with_preprocess(name:str, miner: MINER):
     with open(result_file, "w") as fp:
         fp.write('{"name": '+f'"{name}"'+ ', "result": [\n')
     for i, p in enumerate(paths): 
-        if i == 2: break
         try:
             print(f"START EVAL: {p.name} ({i+1}/{len(paths)})")
 
