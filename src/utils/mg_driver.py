@@ -94,7 +94,7 @@ async def clear() -> None:
 
 # cypher helpers for KG
 
-async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str], source_doc_id:int, source_chunk_id:int, layer:int=0) -> None:
+async def merge_triple(triple:SPOTriple, norm_triple:SPOTriple, triple_descriptions:tuple[str,str,str], source_doc_id:int, source_chunk_id:int, layer:int=0) -> None:
     """
     Upsert an (:Entity) - [:Relation] -> (:Entity) into memgraph from a source SPO triple.
     Performs distinct union on the provenance information (source document id, source chunk ids from document)
@@ -124,9 +124,9 @@ async def merge_triple(triple:SPOTriple, triple_descriptions:tuple[str,str,str],
             "sdesc": triple_descriptions[0],
             "rdesc": triple_descriptions[1],
             "odesc": triple_descriptions[2],
-            "skey": normalize_from_name(triple['s']),
-            "pkey": normalize_from_name(triple['p']),
-            "okey": normalize_from_name(triple['o']),
+            "skey": norm_triple['s'],
+            "pkey": norm_triple['p'],
+            "okey": norm_triple['o'],
             "doc": source_doc_id,
             "chunk": source_chunk_id,
             "layer": layer

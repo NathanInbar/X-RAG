@@ -16,8 +16,6 @@ DATASET_FILE = CWD / "result.json"
 secrets = CWD / "secrets.env"
 
 EMBED_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
-G0_EMBEDDINGS_FILE = CWD / "g0_embeddings.json"
-DOCUMENT_CHUNK_STORE = CWD / "result.json"
 MAX_TOP_CHUNKS = 5
 
 if not secrets.is_file():
@@ -26,9 +24,9 @@ if not secrets.is_file():
 from dotenv import load_dotenv
 load_dotenv(secrets)
 
-entity_embeddings:list[EntityDescEmbed] = []
-with open(G0_EMBEDDINGS_FILE, "r") as ef:
-    entity_embeddings = json.load(ef)
+import logging
+logger = logging.getLogger("leanrag-retrieve")
+logger.setLevel(logging.INFO)
 
 async def _embed_single(s):
     resp = await litellm.aembedding(model=EMBED_MODEL, input=s)
@@ -68,14 +66,19 @@ def search_dense(query_vec: list[float], entity_store: list[dict], topk: int= 10
         for i in top_idx
     ]
 
-async def get_response(user_query:str) -> str:
+async def get_response_context_data(user_query:str, chunks_file:Path) -> str:
     await mg_driver.init()
 
+    embeddings_file = CWD / "g0_embeddings.json"
+    with open(embeddings_file, "r") as ef:
+        entity_embeddings = json.load(ef)
+        
     # 1. embed the query
     prompt_embedding:list[float] = await _embed_single(user_query)
     
     # 2. find top-k seed entities (LeanRAG uses 10)
     seed_entities = search_dense(prompt_embedding, entity_embeddings, topk=10)
+    logger.debug(f"found {len(seed_entities)} seed entities")
 
     ancestor_chains = []
     for s in seed_entities:
@@ -130,22 +133,44 @@ async def get_response(user_query:str) -> str:
     top_chunks = await mg_driver.get_ranked_provenance_for_entitys([e['key'] for e in seed_entities])
     top_chunks = set([c['chunk_id'] for c in top_chunks[:MAX_TOP_CHUNKS]])
     top_chunks_text = []
-    with open(DOCUMENT_CHUNK_STORE, "rb") as in_file:
+    with open(chunks_file, "rb") as in_file:
         for itm in ijson.items(in_file, "item"):
             for chunk in itm['chunks']:
                 if chunk['id'] in top_chunks:
                     top_chunks_text.append(chunk['raw_text'])
+    top_chunks_text = "\n".join(top_chunks_text)
 
     context_ent_info = [(entity_info_map[e]['name'], entity_parent_map[e]['name'], entity_info_map[e]['desc']) for e in entity_info_map]
     context_rpath_info = [ vv['r_desc'] for vv in [v for _,v in reasoning_path_information.items()]]
     context_agg_ent_info = [(vv['name'], vv['desc']) for vv in [v for v in lca_encountered_agg_entities.values()]]
 
+    # convert to string tables:
+    bei_string, aei_string, rpi_string = [],[],[]
+    bei_string.append("entity name, parent, description")# header
+    for row in context_ent_info:
+        bei_string.append(f"{row[0], row[1], row[2]}")
+    bei_string = "\n".join(bei_string)
+
+    aei_string.append("entity name, entity description")# header
+    for row in context_agg_ent_info:
+        aei_string.append(f"{row[0], row[1]}")
+    aei_string = "\n".join(aei_string)
+
+    for row in context_rpath_info:
+        rpi_string.append(row)
+    rpi_string = "\n".join(rpi_string)
+
+    return bei_string, aei_string, rpi_string, top_chunks_text
+
+async def get_response(user_query:str) -> str:
+    bei_string, aei_string, rpi_string, top_chunks_string = await get_response_context_data(user_query)
+
     response = await generate_augmented_response(
         query = user_query,
-        base_entity_info= context_ent_info,
-        agg_entity_info= context_agg_ent_info,
-        reasoning_path_info= context_rpath_info,
-        relevant_chunk_texts = top_chunks_text
+        base_entity_info= bei_string,
+        agg_entity_info= aei_string,
+        reasoning_path_info= rpi_string,
+        relevant_chunk_texts = top_chunks_string
     )
 
     return response
