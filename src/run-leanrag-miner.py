@@ -164,6 +164,8 @@ async def miner_evaluate_individual_with_preprocess(name:str, miner: MINER):
             await miner.reset()
         except Exception as e:
             result = {"error": str(e)}
+            print(f"ERROR: {str(e)}")
+            continue
         finally:
             with open (result_file, "a") as fp:
                 json.dump(result, fp)
