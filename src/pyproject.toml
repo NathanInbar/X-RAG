@@ -19,6 +19,8 @@ dependencies = [
     "litellm>=1.80.0",
     "networkx>=3.6.1",
     "prettytable>=3.17.0",
+    "inflect>=7.5.0",
+    "semhash>=0.3.3",
 ]
 
 [project.optional-dependencies]
