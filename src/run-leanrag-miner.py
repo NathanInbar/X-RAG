@@ -301,12 +301,7 @@ async def build():
 
     await mg_driver.init()
     n_layer0_entities = await mg_driver.count_entities()
-    if n_layer0_entities <= 0:
-        raise RuntimeError("No base-layer entities found; cannot build LeanRAG graph")
-    if n_layer0_entities < CLUSTER_SIZE:
-        max_depth = 1
-    else:
-        max_depth = round(log(n_layer0_entities, CLUSTER_SIZE)) + 1
+    max_depth = round(log(n_layer0_entities, CLUSTER_SIZE)) +1
     logger.info(f"building leanrag kg (max depth = {max_depth})")
 
     # build the graph with recursive hierarchical clustering:
