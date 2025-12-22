@@ -82,7 +82,10 @@ async def get_response_context_data(user_query:str, chunks_file:Path) -> str:
 
     ancestor_chains = []
     for s in seed_entities:
-        chain = await mg_driver.get_ancestor_chain(s['key'])
+        try:
+            chain = await mg_driver.get_ancestor_chain(s['key'])
+        except Exception:
+            continue
         ancestor_chains.append(chain)
 
     # 3. form lca paths from ancestor chains -- collect information for context data
