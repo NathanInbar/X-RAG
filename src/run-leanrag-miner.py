@@ -289,7 +289,8 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
         else:
             icr_desc:str = icr_desc_fallback_concat(inter_cluster_rel)
 
-        await mg_driver.create_inter_cluster_relation(aggJ, aggK, icr_desc, layer+1)
+        rel_layer = max(aggJ['layer'], aggK['layer'])
+        await mg_driver.create_inter_cluster_relation(aggJ, aggK, icr_desc, rel_layer)
     logger.debug(f"\tsuccessfully created inter-aggregate relations! (Done with this layer)")
 
     await aggregate_layer_recursive(layer+1,max_depth)
