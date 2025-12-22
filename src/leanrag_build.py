@@ -96,7 +96,7 @@ async def embed_all_entity_descriptions(entities:list[Entity], batch_size:int, m
 
     return acc
 
-async def build_aggregate_entity(cluster: Cluster) -> tuple[AggEntity | None, list[Finding] | None]:
+async def build_aggregate_entity(cluster: Cluster, layer) -> tuple[AggEntity | None, list[Finding] | None]:
     input_rows: list[str] = []
     input_rows.append("ENTITIES: entity_name, entity_description, entity_degree")
     for i, entity in enumerate(cluster):
@@ -109,16 +109,19 @@ async def build_aggregate_entity(cluster: Cluster) -> tuple[AggEntity | None, li
         input_rows.append(f"{i}: {rel['source_entity']}, {rel['target_entity']}, {rel['relation_description']}")
 
     input_text = "\n".join(input_rows)
-    return await signatures.generate_aggregate_node(input_text=input_text)
+    agg_ent, findings = await signatures.generate_aggregate_node(input_text=input_text)
+    agg_ent['key'] = f"{layer}__{agg_ent['key']}"
+    
+    return agg_ent, findings
 
-async def _aggregate_task(cluster: Cluster, out_aggregates:AsyncList, pbar):
+async def _aggregate_task(cluster: Cluster, out_aggregates:AsyncList, layer, pbar):
     """
     create new aggregate entity from cluster
     - store it in 'aggregates' list.
     - map new agg entity -> findings list in the findings map
     - map new agg entity -> child entity list (cluster) in agg_clst_map
     """
-    new_parent, new_findings = await build_aggregate_entity(cluster)
+    new_parent, new_findings = await build_aggregate_entity(cluster, layer)
     if not (new_parent and new_findings):
         print("ERROR! Got none for new parent or new findings")
         await pbar.update(1)
@@ -239,7 +242,7 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     logger.debug(f"\tcreating aggregates nodes from clusters:")
     layer_aggregates:AsyncList = AsyncList()
     pbar = AsyncProgressBar(total=len(clusters), desc=f"agg tasks (layer {layer})")
-    _aggregation_tasks = [_aggregate_task(cluster, layer_aggregates, pbar) for cluster in clusters.values()]
+    _aggregation_tasks = [_aggregate_task(cluster, layer_aggregates, layer, pbar) for cluster in clusters.values()]
     logger.debug(f"\rrunning {len(_aggregation_tasks)} aggregation tasks ...")
     await asyncio.gather(*_aggregation_tasks, return_exceptions=True)
     await pbar.close()
