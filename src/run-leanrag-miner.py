@@ -23,7 +23,7 @@ from aiolimiter import AsyncLimiter
 from prettytable import PrettyTable
 import textwrap
 
-DATASET_DIRECTORY = Path("../datasets/MINE")
+DATASET_DIRECTORY = Path("../datasets/OURS")
 JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
 results_dir = Path("/tmp/miner")
 
@@ -315,7 +315,7 @@ def show_results():
     
 if __name__ == "__main__":
     eval_routine = evaluate(
-        [miner_evaluate_individual_with_preprocess("leanrag-default", LeanragMINER())], concurrency=1
+        [miner_evaluate_individual_with_preprocess("leanrag-ours-1", LeanragMINER())], concurrency=1
     )
     
     asyncio.run(eval_routine)
