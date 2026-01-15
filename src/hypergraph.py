@@ -14,8 +14,8 @@ class EdgeExtractSignature(dspy.Signature):
 
 	# Steps
 
-	1. Divide the text into several complete knowledge segments. For each knwoledge segment, extract the following information: 
-	- knowledge segment: A senetence that describes the context of the knowledge segment. 
+	1. Divide the text into several complete knowledge segments. For each knowledge segment, extract the following information: 
+	- knowledge segment: A sentence that describes the context of the knowledge segment. 
 	- completeness score: A score form 0 to 10 indicating the completeness of the knowledge segment. 
 
 	2. Identify all entities in each knowledge segment. For each identified entity, extract the following information: 
@@ -28,8 +28,8 @@ class EdgeExtractSignature(dspy.Signature):
 	text: str = dspy.InputField()
 	knowledge_segments: list[tuple[str, int]] = dspy.OutputField(desc="a list of knowledge fragments and their completeness scores")
 	entities: list[tuple[str, str, str, int]] = dspy.OutputField(desc="a list of entity names, types, descriptions, and scores")
-# edge_extract = dspy.ChainOfThought(EdgeExtractSignature)
-edge_extract = dspy.Predict(EdgeExtractSignature)
+edge_extract = dspy.ChainOfThought(EdgeExtractSignature)
+# edge_extract = dspy.Predict(EdgeExtractSignature)
 
 
 async def extract_edges_entities(text: str):
