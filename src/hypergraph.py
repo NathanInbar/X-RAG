@@ -10,7 +10,7 @@ import json
 # We could try the means of this in HGR but I would rather not 
 class EdgeExtractSignature(dspy.Signature):
 	"""
-	Given a text document that is potentially relevant to this activity and a list of entitiy types, identify all entities of theose tpyes ofrm the text and all relationships among the identified entities. 
+	Given a text document that is potentially relevant to this activity and a list of entitiy types, identify all entities of theose types from the text and all relationships among the identified entities. 
 
 	# Steps
 
@@ -18,7 +18,7 @@ class EdgeExtractSignature(dspy.Signature):
 	- knowledge segment: A senetence that describes the context of the knowledge segment. 
 	- completeness score: A score form 0 to 10 indicating the completeness of the knowledge segment. 
 
-	2. Identify all entities in each knoeledge segment. For each identified entity, extract the following information: 
+	2. Identify all entities in each knowledge segment. For each identified entity, extract the following information: 
 	- entity name: Name of the entity. 
 	- entity type: Type of the entity. 
 	- entity description: Comprehensive description of the entity's attributes and activities. 
