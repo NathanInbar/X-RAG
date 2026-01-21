@@ -42,18 +42,18 @@ async def aggregate(
 	entities: list[tuple[str, str, str, int]],
 	embedding_model: str,
 ):
-	print("Aggregate into graph")
+	# print("Aggregate into graph")
 	graph = nx.Graph()
 	cur_idx = 0
 
-	print("Generate embeddings")
+	# print("Generate embeddings")
 	embed_knowledge_input = [k[0] for k in knowledge]
 	embed_entities_input = [e[2] for e in entities] # Embedding of name or desc? Let's try desc 
 	embeddings = litellm.embedding(model=embedding_model, input=embed_knowledge_input+embed_entities_input)
 	embed_knowledge = embeddings.data[:len(embed_knowledge_input)]
 	embed_entities = embeddings.data[len(embed_knowledge_input):]
 
-	print("Add entities")	
+	# print("Add entities")	
 	entities_indices = []
 	for (e, e_t, e_d, e_s), e_em in zip(entities, embed_entities):
 		# Cannot index by name becuase we need to support having multiple with same name s
@@ -68,7 +68,7 @@ async def aggregate(
 		cur_idx += 1
 
 
-	print("Add edges")
+	# print("Add edges")
 	he_indices = []
 	for (k, k_score), k_em in zip(knowledge, embed_knowledge):
 		graph.add_node(cur_idx)
@@ -110,8 +110,8 @@ async def query(
 ):
 	i_entities = np.array([i for i, d in hg.nodes.items() if d["hgr_type"] == "entity"])
 	i_edges = np.array([i for i, d in hg.nodes.items() if d["hgr_type"] == "hyperedge"])
-	print(f"Found {len(i_entities)} entities")
-	print(f"Found {len(i_edges)} hyperedges")
+	# print(f"Found {len(i_entities)} entities")
+	# print(f"Found {len(i_edges)} hyperedges")
 	assert set(i_edges).isdisjoint(set(i_entities)) # No overlap between them 
 
 	e_entities = np.array([hg.nodes[i]["embedding"] for i in i_entities])
@@ -139,7 +139,7 @@ async def query(
 	e_sims = e_sims[e_cutoff] 
 	# Use top kv of them
 	e_selection = i_entities[e_cutoff][np.argsort(e_sims)[::-1][:kv]]
-	print(f"Selected {len(e_selection)} entities")
+	# print(f"Selected {len(e_selection)} entities")
 
 	# Get HE set 
 	he_sims = cosine(q_em, e_edges)
@@ -150,21 +150,21 @@ async def query(
 	he_sims = he_sims[he_cutoff] 
 	# Use top kh of them
 	he_selection = i_edges[he_cutoff][np.argsort(he_sims)[::-1][:kh]]
-	print(f"Selected {len(he_selection)} hyperedges")
+	# print(f"Selected {len(he_selection)} hyperedges")
 
 	# Fusion step
 	# print("e", list(e_selection))
 	# print("h", list(he_selection))
 	assert set(e_selection).isdisjoint(set(he_selection)) # No overlap between them 
 	node_set = set(list(e_selection) + list(he_selection))
-	print(f"Have {len(node_set)} information pieces")
+	# print(f"Have {len(node_set)} information pieces")
 	for e in e_selection:
 		for i in hg.neighbors(e):
 			node_set.add(i)
 	for he in he_selection:
 		for i in hg.neighbors(he):
 			node_set.add(i)
-	print(f"Fusion expand to {len(node_set)} information pieces")
+	# print(f"Fusion expand to {len(node_set)} information pieces")
 	assert len(node_set) >= len(e_selection) + len(he_selection)
 	
 	# Pull textual information
