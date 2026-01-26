@@ -25,7 +25,9 @@ import textwrap
 
 DATASET_DIRECTORY = Path("../datasets/OURS")
 JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
-results_dir = Path("/tmp/miner")
+results_dir = Path("./results")
+if not results_dir.exists():
+    results_dir.mkdir()
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -58,7 +60,7 @@ class LeanragMINER(MINER):
             self.small_articles.add(article_name)
     
     async def retrieve(self, text, preprocess_chunks_filepath:Path):
-        return await leanrag_retrieve.get_response_context_data(text, preprocess_chunks_filepath)
+        return "\n".join(await leanrag_retrieve.get_response_context_data(text, preprocess_chunks_filepath))
     
     async def reset(self):
         await mg_driver.clear()
@@ -302,7 +304,7 @@ def show_results():
         table.add_row([
             name,
             f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
-            f"{concise:.2f}" if concise else "n/a",
+            f"{concise:.8f}" if concise else "n/a",
             f"{efficiency:.2f}" if efficiency else "n/a",
             f"{mean:.2f}s" if mean is not None else "n/a",
             f"{median:.2f}s" if median is not None else "n/a",
