@@ -198,7 +198,7 @@ async def create_aggregate_entity(agg_entity:AggEntity, cluster:Cluster, layer:i
         MERGE (c)-[:IS_CHILD_OF]->(n)
         """,
         {
-            "agg_key": agg_entity['key'],
+            "agg_key": f"{agg_entity['key']}",
             "agg_name": agg_entity['name'],
             "desc": agg_entity['desc'],
             "child_entity_keys" : children_entity_keys,
