@@ -3,6 +3,10 @@ import sys
 CWD = Path(__name__).resolve().parent
 sys.path.append(CWD)
 
+# debug flags
+VERBOSE = 1
+JUST_ONE = 0
+
 secrets = CWD / "secrets.env"
 if not secrets.is_file():
     raise ValueError(f"secrets file at '{secrets}' does not exist")
@@ -23,8 +27,10 @@ from aiolimiter import AsyncLimiter
 from prettytable import PrettyTable
 import textwrap
 
-DATASET_DIRECTORY = Path("../datasets/OURS")
-JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
+DATASET_DIRECTORY = Path("../datasets/OURS/JSON Mine Dataset/")
+# JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
+JUDGE_MODEL = dspy.LM("gemini/gemini-2.5-flash") # CHANGE THIS BACK BEFORE YOU FINISH!!!
+dspy.configure(lm=dspy.LM(model="gemini/gemini-2.5-flash", max_tokens=8000))
 results_dir = Path("./results")
 if not results_dir.exists():
     results_dir.mkdir()
@@ -68,7 +74,6 @@ class LeanragMINER(MINER):
 async def asd():
     await mg_driver.init()
 
-
 class EvalSignature(dspy.Signature):
     """ Does the context contain the information stated in the statement?. """
     context: str = dspy.InputField()
@@ -87,22 +92,66 @@ def score_count(result):
             score += int(query["contained"])
     return score, count
 
+class TrimSignature(dspy.Signature):
+    """Trim the context to only include information necessary to answer the query.
+    Remove irrelevant sections while preserving all relevant content exactly as written."""
+    
+    actual_context: str = dspy.InputField(
+        desc = "The full context that may contain both relevant and irrelevant information"
+    )
+    statement: str = dspy.InputField(
+        desc = "The statement that needs to be derived from the context."
+    )
+    optimal_context: str = dspy.OutputField(
+        desc = (
+            "The trimmed context containing only relevant information needed to derive the statement."
+            "Use the exact wording from the actual_context, ignoring junk characters (like '\n')."
+            "Do not paraphrase, summarize, or rewrite. Remove only the irrelevant sections."
+            "Output plain text with no formatting like bold, italics, or markdown."
+        )
+    )
+
+trim = dspy.Predict(TrimSignature)
+
+def trim_to_optimal(context, statement):
+    result = trim(
+        actual_context=context,
+        statement=statement
+    )
+
+    return result.optimal_context
 
 def conciseness(result):
     """ 
-    For each "correct" response, how long is it? 
-    
-    Note: Having only one correct response that is concise will give a "good" score for this. 
+    For each "correct" response:
+    - Ask LLM to trim to optimal context.
+    - Compute len(optimal)/len(actual)
     """
-    length = 0
-    count = 0
-    for part in result:
-        for query in part["queries"]:
+    optimal_length = 0
+    actual_length = 0
+    print("")
+    for doc in result:
+        if VERBOSE: print(doc['filename'])
+        for query in doc["queries"]:
             if query["contained"]:
-                length += len(query["context"])
-                count += 1
-    return length / count
-
+                actual_context = query["context"]
+                statement = query["query"]
+                optimal_context = trim_to_optimal(actual_context, statement)
+                actual_length += len(actual_context)
+                optimal_length += len(optimal_context)
+                if VERBOSE: print("-" * 100)
+                if VERBOSE: print(f"statement: {statement}\n")
+                if VERBOSE: print(f"actual context ({actual_length}): {actual_context}\n")
+                if VERBOSE: print(f"optimal context ({optimal_length}): {optimal_context}\n")
+        
+        if VERBOSE: print(f"\rDone {doc["filename"]}")
+    if VERBOSE: print(f"total optimal_length: {optimal_length}")
+    if VERBOSE: print(f"total actual_length: {actual_length}")
+    if (actual_length == 0):
+        raise ZeroDivisionError()
+    concision = optimal_length / actual_length
+    if VERBOSE: print(f"MEAN CONCISION: {concision}")
+    return concision
 
 def mean_median_query_time(result):
     times = []
@@ -247,8 +296,8 @@ def show_results():
     table.field_names = [
         "Name",
         "Score",
-        "Context Length",
-        "Conciseness",
+        "% Necessary Context (mean)",
+        # "Conciseness",
         "Query Duration (mean)",
         "Query Duration (median)",
     ]
@@ -291,6 +340,7 @@ def show_results():
                 errors.append(r)
             else:
                 r_no_err.append(r)
+            if JUST_ONE: break
 
         score, count = score_count(r_no_err)
         r_conciseness = conciseness(r_no_err)
@@ -299,13 +349,13 @@ def show_results():
         # avoid division by zero
         pct = (score / count * 100.0) if count else 0.0
         concise = r_conciseness if (r_conciseness and r_conciseness > 0) else 0.0
-        efficiency = (pct / concise) if concise else 0.0
+        # efficiency = (pct / concise) if concise else 0.0
 
         table.add_row([
             name,
             f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
-            f"{concise:.8f}" if concise else "n/a",
-            f"{efficiency:.2f}" if efficiency else "n/a",
+            f"{concise:.2f}%" if concise else "n/a",
+            # f"{efficiency:.2f}" if efficiency else "n/a",
             f"{mean:.2f}s" if mean is not None else "n/a",
             f"{median:.2f}s" if median is not None else "n/a",
         ])
@@ -316,8 +366,12 @@ def show_results():
 
     
 if __name__ == "__main__":
+    # eval_routine = evaluate(
+    #     [miner_evaluate_individual_with_preprocess("leanrag-ours-1", LeanragMINER())], concurrency=1
+    # )
+    # CHANGE LATER
     eval_routine = evaluate(
-        [miner_evaluate_individual_with_preprocess("leanrag-ours-1", LeanragMINER())], concurrency=1
+        [], concurrency=1
     )
     
     asyncio.run(eval_routine)
