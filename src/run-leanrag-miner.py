@@ -11,13 +11,13 @@ from dotenv import load_dotenv
 load_dotenv(secrets)
 
 import utils.mg_driver as mg_driver
-from upsert import upsert_from_preprocessed
-from leanrag_build import build
-import leanrag_retrieve
+from utils.upsert import upsert_from_preprocessed
+from leanrag.leanrag_build import build
+import leanrag.leanrag_retrieve as leanrag_retrieve
 import json
 import time
 import dspy
-from dataset_preprocess import process_dataset_file
+from dataset.dataset_preprocess import process_dataset_file
 import asyncio
 from aiolimiter import AsyncLimiter
 from prettytable import PrettyTable
