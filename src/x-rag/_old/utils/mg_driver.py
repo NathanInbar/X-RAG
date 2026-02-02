@@ -1,2 +1,0 @@
-# Memgraph repository class
-
