@@ -66,8 +66,9 @@ def mean_median_query_time(result):
     median = times[len(times)//2]
     return mean, median
 
-async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER"):
-    paths = list(DATASETS_DIR.iterdir())
+async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", dataset: str):
+    dataset_dir = DATASETS_DIR / dataset
+    paths = list(dataset_dir.iterdir())
     result_file = RESULTS_DIR / f"{name}.json"
     tmp_file = result_file.with_suffix(result_file.suffix + ".tmp")
 
