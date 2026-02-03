@@ -2,5 +2,4 @@ nova_pro: &nova_pro "bedrock/us.amazon.nova-pro-v1:0"
 
 
 models:
-  evaluation_judge: *nova_pro
-  
+  eval_judge: *nova_pro
