@@ -1,7 +1,7 @@
 import asyncio
 from neo4j import AsyncGraphDatabase, AsyncDriver
-from utils import normalize_from_name
-from utils.models import SPOTriple, Entity, AggEntity, IntrClusterRel, Cluster
+from xrag.utils import normalize_from_name
+from xrag.utils.models import SPOTriple, Entity, AggEntity, IntrClusterRel, Cluster
 
 _MG_URI = "bolt://localhost:7687"
 

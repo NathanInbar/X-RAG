@@ -1,7 +1,7 @@
 import dspy
 from asyncio import Semaphore, Lock
-from utils.models import Finding, AggEntity, IntrClusterRel
-from utils import normalize_from_name
+from xrag.utils.models import Finding, AggEntity, IntrClusterRel
+from xrag.utils import normalize_from_name
 
 AGGREGATION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
 RESPONSE_MODEL = "bedrock/us.amazon.nova-pro-v1:0"

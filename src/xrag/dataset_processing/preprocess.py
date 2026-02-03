@@ -8,8 +8,8 @@ from tqdm import tqdm
 from wtpsplit import SaT
 from tokenizers import Tokenizer
 
-from utils import normalize_from_name, stable_id_hex
-from utils.models import SPOTriple, Chunk
+from xrag.utils import normalize_from_name, stable_id_hex
+from xrag.utils.models import SPOTriple, Chunk
 
 from xrag.config import config
 

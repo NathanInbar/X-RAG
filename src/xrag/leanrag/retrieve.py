@@ -1,12 +1,11 @@
-import sys
 from pathlib import Path
 import json
+import ijson
 import litellm
 import numpy as np
-from utils import mg_driver
 from itertools import combinations
-import ijson
-from utils.signatures import generate_augmented_response
+from xrag.utils import mg_driver
+from xrag.utils.signatures import generate_augmented_response
 from xrag.paths import CACHE_DIR
 from xrag.config import config
 
