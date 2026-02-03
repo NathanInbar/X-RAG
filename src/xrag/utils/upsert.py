@@ -1,7 +1,7 @@
 import json, ijson
-from utils.models import SPOTriple, Chunk
-from utils import normalize_from_name
-from utils import mg_driver
+from xrag.utils.models import SPOTriple, Chunk
+from xrag.utils import normalize_from_name
+from xrag.utils import mg_driver
 
 async def upsert_from_preprocessed(input_json, descriptions_json):
     with open(input_json, "rb") as in_file, open(descriptions_json, "r") as descriptions_file:

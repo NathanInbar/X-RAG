@@ -8,13 +8,13 @@ import litellm
 from tqdm import tqdm
 from sklearn.mixture import GaussianMixture
 
-from utils import (
+from xrag.utils import (
     mg_driver, signatures,
     Tokenizer,
     batched, reduce_embeddings,
     get_optimal_clusters_from_embeddings,
 )
-from utils.models import *
+from xrag.utils.models import *
 from xrag.config import config
 from xrag.paths import CACHE_DIR
 #TODO: generate + add entity 'type' property

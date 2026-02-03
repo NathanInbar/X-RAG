@@ -2,11 +2,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[2]
-SRC = ROOT = "src"
+SRC = ROOT / "src"
 DATASETS_DIR = ROOT / "datasets"
 RESULTS_DIR = SRC / "results"
 CACHE_DIR = SRC / "preprocess_cache"
-CONFIG_YAML = SRC / "config.yml"
+CONFIG_YAML = SRC / "config.yaml"
 SECRETS_ENV = SRC / "secrets.env"
 
 if not SECRETS_ENV.exists():
