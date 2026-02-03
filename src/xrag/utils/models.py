@@ -5,12 +5,6 @@ from tqdm import tqdm
 T = TypeVar("T")
 type HexID = str
 
-#TODO: remove this
-class ExtractedSource(dict):
-    id:HexID
-    source: str
-    normalized_text: str
-
 class SPOTriple (TypedDict):
     s:str # subject
     p:str # predicate

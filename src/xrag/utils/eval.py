@@ -1,4 +1,12 @@
+from xrag.paths import DATASETS_DIR, RESULTS_DIR, CACHE_DIR
+import json
+import time
 import dspy
+from aiolimiter import AsyncLimiter
+from prettytable import PrettyTable
+from xrag.utils import mg_driver
+from xrag.config import config
+from xrag.dataset_processing.preprocess import process_dataset_file
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -20,7 +28,6 @@ class _EvalSignature(dspy.Signature):
     context_contains_statement: bool = dspy.OutputField()
 
 dspy_evaluate = dspy.Predict(_EvalSignature)
-
 
 def score_count(result):
     """ Computes total score and count. """
@@ -60,8 +67,8 @@ def mean_median_query_time(result):
     return mean, median
 
 async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER"):
-    paths = list(DATASET_DIRECTORY.iterdir())
-    result_file = results_dir / f"{name}.json"
+    paths = list(DATASETS_DIR.iterdir())
+    result_file = RESULTS_DIR / f"{name}.json"
     tmp_file = result_file.with_suffix(result_file.suffix + ".tmp")
 
     print(f"Writing results file to '{result_file}'")
@@ -113,8 +120,8 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER"):
                 mine_data = json.load(fp)
 
             # Preprocess (only if missing)
-            preprocessed_chunks = CWD / f"{p.stem}__chunks.json"
-            preprocessed_descs = CWD / f"{p.stem}__g0_descriptions.json"
+            preprocessed_chunks = CACHE_DIR / f"{p.stem}__chunks.json"
+            preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
             if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
                 await process_dataset_file(p)
 
@@ -128,7 +135,7 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER"):
             # Query + evaluate
             print("Evaluating...")
             queries = []
-            with dspy.context(lm=JUDGE_MODEL):
+            with dspy.context(lm=config.models["eval_judge"]):
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
                     print(f"\rQuery {j+1}/{len(answers)}", end="")
@@ -197,9 +204,7 @@ def show_results():
         "Query Duration (median)",
     ]
 
-    results_dir.mkdir(exist_ok=True)
-
-    for f in results_dir.iterdir():
+    for f in RESULTS_DIR.iterdir():
         if not f.is_file() or f.suffix.lower() != ".json":
             continue
 
