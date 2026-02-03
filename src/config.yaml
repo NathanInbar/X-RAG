@@ -2,4 +2,26 @@ nova_pro: &nova_pro "bedrock/us.amazon.nova-pro-v1:0"
 
 
 models:
+  tokenizer: "gpt2"
+  segmenter: "sat-3l-sm"
+  embed: "bedrock/amazon.titan-embed-text-v2:0"
+  trip_extract: *nova_pro
   eval_judge: *nova_pro
+  description_gen: *nova_pro
+
+# maximum concurrent llm calls
+llm_concurrency: 
+  embed: 10
+  trip_extract: 8
+  description_gen: 16
+
+preprocess:
+  # segmentation
+  paragraph_thresh: 0.5 # SaT: bias for paragraph length
+  min_chunk_tokens_thresh: 20 # minimum tokens before a segment is considered a chunk
+
+  batch_token_target: 300 # pack chunks into a batch until we cross this threshold
+  max_batch_items: 64 # maximum chunks to batch
+
+  max_descr_length: 300 # max description length in tokens before condensing into a summary
+  max_desc_chunks: 5 # max chunks to describe in a batch -- note -- redundant

@@ -11,23 +11,25 @@ from tokenizers import Tokenizer
 from utils import normalize_from_name, stable_id_hex
 from utils.models import SPOTriple, Chunk
 
-EXTRACTION_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
-MAX_PARALLEL_EXTRACT = 8 # maximum extraction calls to send concurrently
+from xrag.config import config
 
-TOKEN_MODEL = "gpt2"
-SEGMENTER_MODEL = "sat-3l-sm" # SaT model
-PARAGRAPH_THRESHOLD = 0.5 # bias for paragraph length
-MIN_CHUNK_TOKENS_THRESH = 20 # minimum tokens before a segment is considered a chunk
+EXTRACTION_MODEL = config.models["trip_extract"]
+MAX_PARALLEL_EXTRACT = config.llm_concurrency["trip_extract"] # maximum extraction calls to send concurrently
 
-EMBED_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
-MAX_PARALLEL_EMBED = 10 # maximum concurrent embedding model requests
-BATCH_TOKEN_TARGET = 300 # pack chunks into a batch until we cross this threshold
-MAX_BATCH_ITEMS = 64 # cap on request size
+TOKEN_MODEL = config.models["tokenizer"]
+SEGMENTER_MODEL = config.models["segmenter"] # SaT model
+PARAGRAPH_THRESHOLD = config.preprocess["paragraph_thresh"] # bias for paragraph length
+MIN_CHUNK_TOKENS_THRESH = config.preprocess["min_chunk_tokens_thresh"] # minimum tokens before a segment is considered a chunk
 
-DESCRIPTION_GEN_MODEL = "bedrock/us.amazon.nova-pro-v1:0"
-MAX_DESCRIPTION_LENGTH = 300 # max description length in tokens before condensing into a summary
-MAX_CONCURRENT_REQUESTS = 16 # max concurrent requests for LLM inference
-CHUNK_BATCH_SIZE = 5 # how many chunks to process in each batch
+EMBED_MODEL = config.models["embed"]
+MAX_PARALLEL_EMBED = config.llm_concurrency["embed"] # maximum concurrent embedding model requests
+BATCH_TOKEN_TARGET = config.preprocess["batch_token_target"] # pack chunks into a batch until we cross this threshold
+MAX_BATCH_ITEMS = config.preprocess["max_batch_items"] # cap on request size
+
+DESCRIPTION_GEN_MODEL = config.models["description_gen"]
+MAX_DESCRIPTION_LENGTH = config.preprocess["max_desc_length"] # max description length in tokens before condensing into a summary
+MAX_CONCURRENT_REQUESTS = config.llm_concurrency["description_gen"] # max concurrent requests for LLM inference
+CHUNK_BATCH_SIZE = config.preprocess["max_desc_chunks"] # how many chunks to process in each batch
 
 CWD = Path(__name__).resolve().parent
 
