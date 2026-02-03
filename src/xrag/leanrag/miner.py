@@ -1,3 +1,10 @@
+from pathlib import Path
+from xrag.utils import mg_driver
+from xrag.utils.eval import MINER
+from xrag.utils.upsert import upsert_from_preprocessed
+from xrag.leanrag.build import build
+from xrag.leanrag.retrieve import get_response_context_data
+
 class LeanragMINER(MINER):
     def __init__(self):
         # tracks how many ingested articles were too small to construct a 'proper' leanrag graph
@@ -16,7 +23,7 @@ class LeanragMINER(MINER):
             self.small_articles.add(article_name)
     
     async def retrieve(self, text, preprocess_chunks_filepath:Path):
-        return "\n".join(await leanrag_retrieve.get_response_context_data(text, preprocess_chunks_filepath))
+        return "\n".join(await get_response_context_data(text, preprocess_chunks_filepath))
     
     async def reset(self):
         await mg_driver.clear()
