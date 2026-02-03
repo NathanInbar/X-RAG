@@ -1,7 +1,5 @@
-import sys
 import json
 import asyncio
-from pathlib import Path
 from math import log
 from itertools import combinations
 import logging
@@ -17,19 +15,16 @@ from utils import (
     get_optimal_clusters_from_embeddings,
 )
 from utils.models import *
-
+from xrag.config import config
+from xrag.paths import CACHE_DIR
 #TODO: generate + add entity 'type' property
 
-CWD = Path(__file__).resolve().parent
-DATASET_FILE = CWD / "result.json"
-embed_cache_file = CWD / "embed_cache.json"
+EMBED_MODEL = config.models["embed"]
+G0_EMBEDDINGS_FILE = CACHE_DIR / "g0_embeddings.json"
+ENTITY_BATCH_SIZE = config.leanrag["entity_batch_size"]
+MAX_PARALLEL_EMBED = config.llm_concurrency["embed"]
 
-EMBED_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
-G0_EMBEDDINGS_FILE = CWD / "g0_embeddings.json"
-ENTITY_BATCH_SIZE = 32
-MAX_PARALLEL_EMBED = 8
-
-CLUSTER_SIZE = 20
+CLUSTER_SIZE = config.leanrag["cluster_size"]
 
 # DEBUG_LAYER_START = 0
 # DEBUG_LAYER_STOP = 1
@@ -284,26 +279,18 @@ async def build():
     global root_layer
     root_layer = -1
 
-    await mg_driver.init()
-    n_layer0_entities = await mg_driver.count_entities()
-    max_depth = round(log(n_layer0_entities, CLUSTER_SIZE)) +1
-    logger.info(f"building leanrag kg (max depth = {max_depth})")
+    try:
+        await mg_driver.init()
+        n_layer0_entities = await mg_driver.count_entities()
+        max_depth = round(log(n_layer0_entities, CLUSTER_SIZE)) +1
+        logger.info(f"building leanrag kg (max depth = {max_depth})")
 
-    # build the graph with recursive hierarchical clustering:
-    await build_hierarchy(max_depth)
+        # build the graph with recursive hierarchical clustering:
+        await build_hierarchy(max_depth)
 
-    await mg_driver.set_root_entities(root_layer)
-    logger.info(f"leanrag kg built! ({root_layer} layers)")
-    return root_layer
-
-if __name__ == "__main__":
-    sys.path.append(CWD)
-    secrets = CWD / "secrets.env"
-
-    if not secrets.is_file():
-        raise ValueError(f"secrets file at '{secrets}' does not exist")
-
-    from dotenv import load_dotenv
-    load_dotenv(secrets)
-
-    asyncio.run(build())
+        await mg_driver.set_root_entities(root_layer)
+        logger.info(f"leanrag kg built! ({root_layer} layers)")
+        return root_layer
+    except Exception as e:
+        G0_EMBEDDINGS_FILE.unlink() # delete the g0 embed cache if this build() step failed
+        raise e

@@ -1,35 +1,23 @@
 import sys
 from pathlib import Path
 import json
-from utils.models import EntityDescEmbed
 import litellm
 import numpy as np
 from utils import mg_driver
 from itertools import combinations
 import ijson
 from utils.signatures import generate_augmented_response
+from xrag.paths import CACHE_DIR
+from xrag.config import config
 
-CWD = Path(__name__).resolve().parent
-sys.path.append(CWD)
-
-DATASET_FILE = CWD / "result.json"
-secrets = CWD / "secrets.env"
-
-EMBED_MODEL = "bedrock/amazon.titan-embed-text-v2:0"
-MAX_TOP_CHUNKS = 5
-
-if not secrets.is_file():
-    raise ValueError(f"secrets file at '{secrets}' does not exist")
-
-from dotenv import load_dotenv
-load_dotenv(secrets)
+MAX_TOP_CHUNKS = config.leanrag["max_top_chunks"]
 
 import logging
 logger = logging.getLogger("leanrag-retrieve")
 logger.setLevel(logging.INFO)
 
 async def _embed_single(s):
-    resp = await litellm.aembedding(model=EMBED_MODEL, input=s)
+    resp = await litellm.aembedding(model=config.models["embed"], input=s)
     data = resp['data'][0]
     return data['embedding'] 
 
@@ -69,7 +57,7 @@ def search_dense(query_vec: list[float], entity_store: list[dict], topk: int= 10
 async def get_response_context_data(user_query:str, chunks_file:Path) -> str:
     await mg_driver.init()
 
-    embeddings_file = CWD / "g0_embeddings.json"
+    embeddings_file = CACHE_DIR / "g0_embeddings.json"
     with open(embeddings_file, "r") as ef:
         entity_embeddings = json.load(ef)
         
