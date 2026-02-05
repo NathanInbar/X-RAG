@@ -1,7 +1,12 @@
+# model definitions
 nova_pro: &nova_pro "bedrock/us.amazon.nova-pro-v1:0"
 titan_v2: &titan_v2 "bedrock/amazon.titan-embed-text-v2:0"
 sat_3l_sm: &sat_3l_sm "sat-3l-sm"
 gpt2: &gpt2 "gpt2"
+
+
+dataset: "OURS_TEST"
+
 
 # llm models
 models:
