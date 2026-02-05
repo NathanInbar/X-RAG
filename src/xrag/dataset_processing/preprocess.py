@@ -7,11 +7,13 @@ import json
 from tqdm import tqdm
 from wtpsplit import SaT
 from tokenizers import Tokenizer
+import logging
 
 from xrag.utils import normalize_from_name, stable_id_hex
 from xrag.utils.models import SPOTriple, Chunk
 
 from xrag.config import config
+from xrag.paths import CACHE_DIR
 
 EXTRACTION_MODEL = config.models["trip_extract"]
 MAX_PARALLEL_EXTRACT = config.llm_concurrency["trip_extract"] # maximum extraction calls to send concurrently
@@ -31,17 +33,19 @@ MAX_DESCRIPTION_LENGTH = config.preprocess["max_desc_length"] # max description 
 MAX_CONCURRENT_REQUESTS = config.llm_concurrency["description_gen"] # max concurrent requests for LLM inference
 CHUNK_BATCH_SIZE = config.preprocess["max_desc_chunks"] # how many chunks to process in each batch
 
-CWD = Path(__name__).resolve().parent
-
-secrets = CWD / "secrets.env"
-if not secrets.is_file():
-    raise ValueError(f"secrets file at '{secrets}' does not exist")
-from dotenv import load_dotenv
-load_dotenv(secrets)
-
 _embed_sem = Semaphore(MAX_PARALLEL_EMBED)
 triple_sem = Semaphore(MAX_PARALLEL_EXTRACT)
 # - - - - -- - dspy PROMPTS
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter(
+    "%(levelname)s | %(filename)s:%(lineno)d | %(message)s"
+))
+
+logger.addHandler(handler)
 
 class _SummarizeDescription(dspy.Signature):
     """Generate a short summary from the description."""
@@ -139,7 +143,7 @@ class TripleExtractor:
             with dspy.context(lm=self._lm):
                 pred = await dspy.Predict(_ExtractTriples).acall(source_text=text)
         except Exception as e:
-            print(f"Triplet extraction error: {type(e).__name__}: {e}")
+            logger.error(f"Triplet extraction error: {type(e).__name__}: {e}")
             return []
 
         raw = getattr(pred, "triples_json", "") or "[]"
@@ -149,7 +153,7 @@ class TripleExtractor:
             if not isinstance(data, list):
                 raise ValueError("triples_json must be a JSON array")
         except Exception as e:
-            print(f"DSPy triples_json parse failure: {e}; raw={raw[:200]!r}")
+            logger.error(f"DSPy triples_json parse failure: {e}; raw={raw[:200]!r}")
             return []
 
         out: list[SPOTriple] = []
@@ -391,6 +395,7 @@ async def _extract_triple_from_chunk(chunk: Chunk) -> None:
 
     chunk['triples'] = triples
     
+    
 async def extract_chunk_triples(chunks:list[Chunk]) -> None:
     # schedule extraction tasks in waves
     WAVE = MAX_PARALLEL_EXTRACT * 2
@@ -408,9 +413,14 @@ async def extract_chunk_triples(chunks:list[Chunk]) -> None:
 
 
 async def describe_trips_in_chunk(chunk: Chunk):
+    logger.debug(f"describing triples: '{chunk['triples']}'")
+    if chunk['triples'] == []:
+        return
+    
     async def _describe_triple(triple: SPOTriple):
         descriptions = await description_generator.generate(triple, chunk['raw_text'])
-
+        if descriptions is None: #err
+            return
         s_key = normalize_from_name(triple["s"])
         o_key = normalize_from_name(triple["o"])
         p_key = s_key + "__" + normalize_from_name(triple["p"]) + "__" + o_key
@@ -456,9 +466,10 @@ async def describe_all_chunks(chunks):
         pbar.close()
 
 async def process_dataset_file(file:Path):
+    logger.debug(f"Processing file: '{file.stem}'")
     description_map.map.clear()
-    out_results_filename = f"{file.stem}__chunks.json"
-    out_descriptions_filename = f"{file.stem}__g0_descriptions.json"
+    out_results_filename = CACHE_DIR / f"{file.stem}__chunks.json"
+    out_descriptions_filename = CACHE_DIR / f"{file.stem}__g0_descriptions.json"
 
     # dataset file should have an 'essay' field
     with open(file, "r") as fp:
@@ -492,7 +503,9 @@ async def process_dataset_file(file:Path):
         if(n_tokens > max_tokens):
             max_tokens = n_tokens
 
+    logger.debug(f"Generating chunk embeddings ...")
     await generate_chunk_embeddings(chunks)
+    logger.debug(f"Extracting chunk triples ...")
     await extract_chunk_triples(chunks)
 
     # results.json file
