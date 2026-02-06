@@ -4,7 +4,7 @@ CWD = Path(__name__).resolve().parent
 sys.path.append(CWD)
 
 # debug flags
-VERBOSE = 1
+VERBOSE = 0
 JUST_ONE = 0
 
 secrets = CWD / "secrets.env"
@@ -28,9 +28,8 @@ from prettytable import PrettyTable
 import textwrap
 
 DATASET_DIRECTORY = Path("../datasets/OURS/JSON Mine Dataset/")
-# JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
-JUDGE_MODEL = dspy.LM("gemini/gemini-2.5-flash") # CHANGE THIS BACK BEFORE YOU FINISH!!!
-dspy.configure(lm=dspy.LM(model="gemini/gemini-2.5-flash", max_tokens=8000))
+JUDGE_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0")
+TRIM_MODEL = dspy.LM("bedrock/us.amazon.nova-pro-v1:0", max_tokens=8000)
 results_dir = Path("./results")
 if not results_dir.exists():
     results_dir.mkdir()
@@ -105,19 +104,20 @@ class TrimSignature(dspy.Signature):
     optimal_context: str = dspy.OutputField(
         desc = (
             "The trimmed context containing only relevant information needed to derive the statement."
-            "Use the exact wording from the actual_context, ignoring junk characters (like '\n')."
+            "Use the exact wording from the actual_context."
             "Do not paraphrase, summarize, or rewrite. Remove only the irrelevant sections."
-            "Output plain text with no formatting like bold, italics, or markdown."
+            "Output plain text with no formatting (bold, italics, or markdown)."
         )
     )
 
 trim = dspy.Predict(TrimSignature)
 
 def trim_to_optimal(context, statement):
-    result = trim(
-        actual_context=context,
-        statement=statement
-    )
+    with dspy.context(lm=TRIM_MODEL):
+        result = trim(
+            actual_context=context,
+            statement=statement
+        )
 
     return result.optimal_context
 
@@ -296,7 +296,8 @@ def show_results():
     table.field_names = [
         "Name",
         "Score",
-        "% Necessary Context (mean)",
+        "Necessary Context",
+        "Score with Conciseness",
         # "Conciseness",
         "Query Duration (mean)",
         "Query Duration (median)",
@@ -350,12 +351,16 @@ def show_results():
         pct = (score / count * 100.0) if count else 0.0
         concise = r_conciseness if (r_conciseness and r_conciseness > 0) else 0.0
         # efficiency = (pct / concise) if concise else 0.0
+        alpha = 0.8
+        beta = 1 - alpha
+        overall = alpha * pct + beta * r_conciseness
 
         table.add_row([
             name,
             f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
             f"{concise:.2f}%" if concise else "n/a",
             # f"{efficiency:.2f}" if efficiency else "n/a",
+            f"{overall:.2f}%" if overall else "n/a",
             f"{mean:.2f}s" if mean is not None else "n/a",
             f"{median:.2f}s" if median is not None else "n/a",
         ])
@@ -364,12 +369,18 @@ def show_results():
     print("\nERRORS:")
     print(errors)
 
+    # print table to file
+    outfile = "./karen_tests/test8.txt"
+    with open(outfile, 'w') as f:
+        f.write(table.get_string())
+        f.write("\nERRORS:")
+        f.write(str(errors))
+
     
 if __name__ == "__main__":
     # eval_routine = evaluate(
     #     [miner_evaluate_individual_with_preprocess("leanrag-ours-1", LeanragMINER())], concurrency=1
     # )
-    # CHANGE LATER
     eval_routine = evaluate(
         [], concurrency=1
     )
