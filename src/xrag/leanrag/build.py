@@ -1,4 +1,5 @@
 import json
+import random
 import asyncio
 from math import log
 from itertools import combinations
@@ -23,8 +24,9 @@ EMBED_MODEL = config.models["embed"]
 G0_EMBEDDINGS_FILE = CACHE_DIR / "g0_embeddings.json"
 ENTITY_BATCH_SIZE = config.leanrag["entity_batch_size"]
 MAX_PARALLEL_EMBED = config.llm_concurrency["embed"]
-
 CLUSTER_SIZE = config.leanrag["cluster_size"]
+INITIAL_DELAY = config.llm_retry["initial_delay"]
+MAX_ATTEMPTS = config.llm_retry["max_attempts"]
 
 # DEBUG_LAYER_START = 0
 # DEBUG_LAYER_STOP = 1
@@ -42,7 +44,7 @@ root_layer:int = -1
 
 # LOGGER
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.WARN,
     format="%(levelname)s - %(message)s",
     force=True
 )
@@ -52,14 +54,40 @@ logger.setLevel(logging.INFO)
 
 async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
-    async with embed_sem:
-        resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
-    batch_embed = resp['data']
-    # unpack batch to entity_key -> description pairs
-    rows = [
-        EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
-        for emb in sorted(batch_embed, key=lambda e: e.index)
-    ]
+    count_no_desc = 0
+    count_empty_desc = 0
+    total_descriptions = len(batch)
+    for e in batch:
+        if not e["desc"]: count_no_desc += 1
+        elif e["desc"] == "" : count_empty_desc += 1
+
+    retry_delay = INITIAL_DELAY
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            async with embed_sem:
+                resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
+            batch_embed = resp['data']
+            # unpack batch to entity_key -> description pairs
+            rows = [
+                EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
+                for emb in sorted(batch_embed, key=lambda e: e.index)
+            ]
+            break
+        except Exception as e:
+            if attempt+1 == MAX_ATTEMPTS:
+                error_message = f"Max retry attempts reached. Skipping {len(batch)} descriptions: {e}"
+                logger.error(error_message)
+                raise RuntimeError(error_message)
+            logger.error(f"Embed attempt {attempt} failed for {len(batch)} descriptions. Retrying in {retry_delay}s: {e}")
+            await asyncio.sleep(retry_delay)
+            retry_delay *= 2
+            retry_delay += random.uniform(0, 1)
+
+    if len(rows) != total_descriptions:
+        raise RuntimeError(f"Expected {total_descriptions} embeddings, got {len(rows)}.\n \
+                            Num entities with no description: {count_no_desc}\n \
+                            Num entities with empty description: {count_empty_desc}")
+
     await acc.extend(rows)
     await pbar.update(len(batch))
 
@@ -160,35 +188,35 @@ async def build_hierarchy(max_depth:int):
 
 async def aggregate_layer_recursive(layer:int, max_depth:int):
     global root_layer
-    logger.debug(f"Aggregating Layer {layer} ...")
+    logger.info(f"Aggregating Layer {layer} ...")
     #debug
     # if DEBUG_LAYER_STOP > 0 and layer == DEBUG_LAYER_STOP:
     #     root_layer = layer
-    #     logger.debug(f"\tSTOP!: stopped at this layer due to DEBUG_LAYER_STOP flag")
+    #     logger.info(f"\tSTOP!: stopped at this layer due to DEBUG_LAYER_STOP flag")
     #     return
 
     if layer > max_depth:
         root_layer = layer
-        logger.debug(f"\tSTOP!: stopped at this layer, hit max depth of {max_depth}")
+        logger.info(f"\tSTOP!: stopped at this layer, hit max depth of {max_depth}")
         return
     
     # 1. collect all entities in the layer
     entities:list[Entity] = await mg_driver.get_entities_for_layer(layer)
     n_entities:int = len(entities)
-    logger.debug(f"\tcollected {n_entities} entites in layer.")
+    logger.info(f"\tcollected {n_entities} entites in layer.")
 
     if n_entities <= 2:
         root_layer = layer
-        logger.debug(f"\tSTOP!: stopped at this layer, not enough entities (<= 2)")
+        logger.info(f"\tSTOP!: stopped at this layer, not enough entities (<= 2)")
         return
 
-    logger.debug(f"\tgenerating embeddings for {n_entities} entity descriptions ...")
+    logger.info(f"\tgenerating embeddings for {n_entities} entity descriptions ...")
     # 2. get embeddings
     pbar = AsyncProgressBar(total=n_entities, desc="Entity description embeddings")
     entity_desc_embeds:AsyncList[EntityDescEmbed] = await embed_all_entity_descriptions(entities, ENTITY_BATCH_SIZE, MAX_PARALLEL_EMBED, layer, pbar=pbar)
     await pbar.close()
 
-    logger.debug(f"\tsuccessfully created {len(entity_desc_embeds)} embeddings!")
+    logger.info(f"\tsuccessfully created {len(entity_desc_embeds)} embeddings!")
     if (len(entity_desc_embeds) != n_entities):
         raise RuntimeError(f"layer {layer}: Tried to embed {n_entities} entity descriptions, but got {len(entity_desc_embeds)} embeddings back!")
 
@@ -196,18 +224,18 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
     raw_embeds_arr = np.asarray([e["desc_embed"] for e in entity_desc_embeds], dtype=np.float32)
     _shape_before = raw_embeds_arr.shape
     raw_embeds_arr = reduce_embeddings(raw_embeds_arr, reduction_dim=min(2, n_entities-2))
-    logger.debug(f"\treduced embedding shape from {_shape_before} -> {raw_embeds_arr.shape}")
+    logger.info(f"\treduced embedding shape from {_shape_before} -> {raw_embeds_arr.shape}")
 
     # 4. Calculate num of paritions for this layer
-    logger.debug(f"\tcalculating number of partitions with heuristic and BCI ...")
+    logger.info(f"\tcalculating number of partitions with heuristic and BCI ...")
     heuristic = n_entities // CLUSTER_SIZE
     bci_rec = get_optimal_clusters_from_embeddings(raw_embeds_arr)
     n_components = max(heuristic, bci_rec)
-    logger.debug(f"\theuristic: {heuristic}, BCI: {bci_rec}. Chose n_components = ({n_components})")
+    logger.info(f"\theuristic: {heuristic}, BCI: {bci_rec}. Chose n_components = ({n_components})")
 
     if layer != 0 and n_components <= 4:
         root_layer = layer
-        logger.debug(f"\tSTOP!: stopped because number of partitions is small (<=4)")
+        logger.info(f"\tSTOP!: stopped because number of partitions is small (<=4)")
         return
 
     clusters: dict[int, Cluster] = None
@@ -216,7 +244,7 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
         clusters = {0: entities}
     else:
         # 5. Partition layer into clusters
-        logger.debug(f"\tfitting embeddings into GMM with n_components={n_components} ...")
+        logger.info(f"\tfitting embeddings into GMM with n_components={n_components} ...")
         gmm:GaussianMixture = GaussianMixture(
             n_components= n_components,
             covariance_type="full",
@@ -231,31 +259,31 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
         for i, k in enumerate(labels):
             clusters[int(k)].append(entities[i])
 
-    logger.debug(f"\tsuccessfully built {len(clusters.keys())} clusters")
+    logger.info(f"\tsuccessfully built {len(clusters.keys())} clusters")
 
     # 6. Create aggregate nodes
-    logger.debug(f"\tcreating aggregates nodes from clusters:")
+    logger.info(f"\tcreating aggregates nodes from clusters:")
     layer_aggregates:AsyncList = AsyncList()
     pbar = AsyncProgressBar(total=len(clusters), desc=f"agg tasks (layer {layer})")
     _aggregation_tasks = [_aggregate_task(cluster, layer_aggregates, layer, pbar) for cluster in clusters.values()]
-    logger.debug(f"\rrunning {len(_aggregation_tasks)} aggregation tasks ...")
+    logger.info(f"\rrunning {len(_aggregation_tasks)} aggregation tasks ...")
     await asyncio.gather(*_aggregation_tasks, return_exceptions=True)
     await pbar.close()
-    logger.debug(f"\tsuccessfully built data for {len(layer_aggregates)} unique aggregate entities! creating nodes in memgraph ...")
+    logger.info(f"\tsuccessfully built data for {len(layer_aggregates)} unique aggregate entities! creating nodes in memgraph ...")
 
     for agg in layer_aggregates:
         await mg_driver.create_aggregate_entity(agg, agg_clst_map[agg['key']], layer+1)
-    logger.debug("\tsuccesffuly created aggregate entity nodes")
+    logger.info("\tsuccesffuly created aggregate entity nodes")
 
     # 7. Create inter-cluster relations
     if layer == 0 and n_components <= 4:
         # no need for this step for the small-graph case
         root_layer = layer+1
-        logger.debug(f"\tSTOP!: stopped because this graph was too small (created single aggregate)")
+        logger.info(f"\tSTOP!: stopped because this graph was too small (created single aggregate)")
         return
     
     allowed_tokens = ( max_depth - layer ) * 40 * 2
-    logger.debug(f"\tcreating inter-aggregate relations. (allowed tokens: {allowed_tokens})")
+    logger.info(f"\tcreating inter-aggregate relations. (allowed tokens: {allowed_tokens})")
     for aggJ, aggK in tqdm(combinations(layer_aggregates, 2), desc="aggregate entity inter-relations"):
         
         inter_cluster_rel:list[IntrClusterRel] = await mg_driver.get_inter_cluster_relations(agg_clst_map[aggJ['key']], agg_clst_map[aggK['key']])
@@ -271,7 +299,7 @@ async def aggregate_layer_recursive(layer:int, max_depth:int):
             icr_desc:str = icr_desc_fallback_concat(inter_cluster_rel)
 
         await mg_driver.create_inter_cluster_relation(aggJ, aggK, icr_desc, layer+1)
-    logger.debug(f"\tsuccessfully created inter-aggregate relations! (Done with this layer)")
+    logger.info(f"\tsuccessfully created inter-aggregate relations! (Done with this layer)")
 
     await aggregate_layer_recursive(layer+1,max_depth)
 
