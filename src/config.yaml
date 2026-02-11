@@ -4,7 +4,7 @@ titan_v2: &titan_v2 "bedrock/amazon.titan-embed-text-v2:0"
 sat_3l_sm: &sat_3l_sm "sat-3l-sm"
 gpt2: &gpt2 "gpt2"
 
-dataset: "OURS_TEST"
+dataset: "OURS/JSON Mine Dataset"
 
 # llm models
 models:
@@ -14,6 +14,7 @@ models:
   trip_extract: *nova_pro
   eval_judge: *nova_pro
   description_gen: *nova_pro
+  trim_model: *nova_pro
 
 # maximum concurrent llm calls
 llm_concurrency:

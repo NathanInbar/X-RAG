@@ -1,8 +1,6 @@
 from xrag.paths import DATASETS_DIR, RESULTS_DIR, CACHE_DIR
 
-VERBOSE = 0
-JUST_ONE = 1
-
+import math
 import json
 import time
 import dspy
@@ -10,7 +8,14 @@ from aiolimiter import AsyncLimiter
 from prettytable import PrettyTable
 from xrag.utils import mg_driver
 from xrag.config import config
-from xrag.dataset_processing.preprocess import process_dataset_file
+from xrag.dataset_processing.preprocess import process_dataset_file, TextSegmenter
+
+VERBOSE = 0
+JUST_ONE = 1
+
+_JUDGE_MODEL = dspy.LM(config.models["eval_judge"])
+_TRIM_MODEL = dspy.LM(config.models["trim_model"])
+_SEGMENTER_MODEL = config.models["segmenter"]
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -56,22 +61,67 @@ class TrimSignature(dspy.Signature):
     optimal_context: str = dspy.OutputField(
         desc = (
             "The trimmed context containing only relevant information needed to derive the statement."
+            "If no relevant information exists in the text, make optimal_context empty."
             "Use the exact wording from the actual_context."
             "Do not paraphrase, summarize, or rewrite. Remove only the irrelevant sections."
             "Output plain text with no formatting (bold, italics, or markdown)."
         )
     )
 
+
 trim = dspy.Predict(TrimSignature)
 
-def trim_to_optimal(context, statement):
-    with dspy.context(lm=config.models["eval_judge"]):
-        result = trim(
-            actual_context=context,
-            statement=statement
-        )
 
-    return result.optimal_context
+def chunk_context(text, chunk_size):
+    """Split text into chunks at paragraph/sentence boundaries."""
+    chunks = []
+    current_pos = 0
+    
+    while current_pos < len(text):
+        end_pos = current_pos + chunk_size
+        
+        if end_pos >= len(text):
+            chunks.append(text[current_pos:])
+            break
+        
+        chunk_text = text[current_pos:end_pos]
+        last_break = chunk_text.rfind('\n\n')
+        
+        if last_break > chunk_size * 0.5:
+            end_pos = current_pos + last_break
+        else:
+            last_sentence = max(
+                chunk_text.rfind('. '),
+                chunk_text.rfind('.\n'),
+                chunk_text.rfind('! '),
+                chunk_text.rfind('? ')
+            )
+            if last_sentence > chunk_size * 0.5:
+                end_pos = current_pos + last_sentence + 1
+        
+        chunks.append(text[current_pos:end_pos])
+        current_pos = end_pos
+    
+    return chunks
+
+def trim_to_optimal(context, statement, max_chunk_size = 8000):
+    chunks = chunk_context(context, max_chunk_size)
+    print(f"total chunks: {len(chunks)}")
+    all_optimal = []
+    with dspy.context(lm=_TRIM_MODEL):
+        for context in chunks:
+            result = trim(
+                actual_context=context,
+                statement=statement
+            )
+
+            if not result.optimal_context == '':
+                all_optimal.append(result.optimal_context)
+
+    print(f"total optimal from chunks: {len(all_optimal)}")
+    optimal_context = " ".join(all_optimal)
+    return optimal_context
+
 
 def conciseness(result):
     """ 
@@ -79,43 +129,45 @@ def conciseness(result):
     - Ask LLM to trim to optimal context.
     - Compute len(optimal)/len(actual)
     """
-    optimal_length = 0
+    # optimal_length = 0
     actual_length = 0
-    print("")
+    count = 0
     for doc in result:
-        if VERBOSE: print(doc['filename'])
-        for query in doc["queries"]:
+        # if VERBOSE: print(doc['filename'])
+        for i, query in enumerate(doc["queries"]):
             if query["contained"]:
+                # print(f"Measuring conciseness for query {i+1}/15")
                 actual_context = query["context"]
-                statement = query["query"]
-                optimal_context = trim_to_optimal(actual_context, statement)
+                # optimal_context = query["optimal_context"]
+
                 actual_length += len(actual_context)
-                optimal_length += len(optimal_context)
-                if VERBOSE: print("-" * 100)
-                if VERBOSE: print(f"statement: {statement}\n")
-                if VERBOSE: print(f"actual context ({actual_length}): {actual_context}\n")
-                if VERBOSE: print(f"optimal context ({optimal_length}): {optimal_context}\n")
-        
-        if VERBOSE: print(f"\rDone {doc["filename"]}")
-    if VERBOSE: print(f"total optimal_length: {optimal_length}")
-    if VERBOSE: print(f"total actual_length: {actual_length}")
-    if (actual_length == 0):
-        raise ZeroDivisionError()
-    concision = optimal_length / actual_length
-    if VERBOSE: print(f"MEAN CONCISION: {concision}")
-    return concision
+                # optimal_length += len(optimal_context)
+                count += 1
+
+    try:
+        # avg_optimal = optimal_length / count
+        avg_actual = actual_length / count
+        return avg_actual
+    except ZeroDivisionError:
+        print("ERROR: could not get avg context length, length of input context was 0.")
+        return 0
+   
 
 def mean_median_query_time(result):
-    times = []
-    for part in result:
-        for query in part["queries"]:
-            times.append(query["duration"])
-    mean = sum(times) / len(times)
-    times.sort()
-    median = times[len(times)//2]
-    return mean, median
+    try:
+        times = []
+        for part in result:
+            for query in part["queries"]:
+                times.append(query["duration"])
+        mean = sum(times) / len(times)
+        times.sort()
+        median = times[len(times)//2]
+        return mean, median
+    except ZeroDivisionError:
+        print(f"ERROR: Could not calculate mean/median query times: no times existed for result")
+        return None, None
 
-async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", dataset: str):
+async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, with_preprocess: bool = False):
     dataset_dir = DATASETS_DIR / dataset
     paths = list(dataset_dir.iterdir())
     result_file = RESULTS_DIR / f"{name}.json"
@@ -169,36 +221,53 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
             with open(p, "r") as fp:
                 mine_data = json.load(fp)
 
-            # Preprocess (only if missing)
-            preprocessed_chunks = CACHE_DIR / f"{p.stem}__chunks.json"
-            preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
-            if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
-                await process_dataset_file(p)
+            # Preprocess?
+            if with_preprocess:
+                preprocessed_chunks = CACHE_DIR / f"{p.stem}__chunks.json"
+                preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
+                if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
+                    await process_dataset_file(p)
 
             # Ingest
             print("Ingesting...")
             ingest_st = time.time()
-            await miner.ingest(preprocessed_chunks, preprocessed_descs)
-            await miner.pre_retrieve(p.name)
+            if with_preprocess:
+                await miner.ingest(preprocessed_chunks, preprocessed_descs)
+                await miner.pre_retrieve(p.name)
+            else:
+                await miner.ingest(mine_data.get("essay", []))
+                await miner.pre_retrieve()
+            
             ingest_en = time.time()
-
+            
             # Query + evaluate
             print("Evaluating...")
             queries = []
-            with dspy.context(lm=config.models["eval_judge"]):
+            with dspy.context(lm=_JUDGE_MODEL):
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
-                    print(f"\rQuery {j+1}/{len(answers)}", end="")
+                    print(f"Query {j+1}/{len(answers)} ...")
                     q_st = time.time()
-                    info = await miner.retrieve(a, preprocessed_chunks)
+                    if with_preprocess:
+                        info = await miner.retrieve(a, preprocessed_chunks)
+                    else:
+                        info = await miner.retrieve(a)
                     q_en = time.time()
-                    contained = (await eval.acall(context=info, statement=a)).context_contains_statement
+
+                    # optimal_info = trim_to_optimal(info, a)
+
+                    contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
+
+                    # optimal_contained = (await dspy_evaluate.acall(context=optimal_info, statement=a)).context_contains_statement
+
                     queries.append(
                         {
                             "query": a,
-                            "context": info,
+                            "context": info,           
                             "contained": contained,
                             "duration": q_en - q_st,
+                            # "optimal_context": optimal_info,
+                            # "optimal_contained": optimal_contained
                         }
                     )
                 print("")
@@ -248,8 +317,11 @@ def show_results():
     table.field_names = [
         "Name",
         "Score",
-        "Necessary Context",
-        "Score with Conciseness",
+        # "Score of Optimal",
+        "Avg. Context Length",
+        # "Avg. Optimal Length",
+        # "% Necessary Context",
+        # "Overall",
         # "Conciseness",
         "Query Duration (mean)",
         "Query Duration (median)",
@@ -294,23 +366,27 @@ def show_results():
             if JUST_ONE: break
 
         score, count = score_count(r_no_err)
-        r_conciseness = conciseness(r_no_err)
+        avg_len_act = conciseness(r_no_err)
         mean, median = mean_median_query_time(r_no_err)
 
         # avoid division by zero
         pct = (score / count * 100.0) if count else 0.0
-        concise = r_conciseness if (r_conciseness and r_conciseness > 0) else 0.0
+        # optimal_pct = (optimal_score / count * 100.0) if count else 0.0
+        # concise = avg_len_opt / avg_len_act if avg_len_act != 0 else 0.0
         # efficiency = (pct / concise) if concise else 0.0
-        alpha = 0.8
-        beta = 1 - alpha
-        overall = alpha * pct + beta * r_conciseness
+        # alpha = 0.8
+        # beta = 1 - alpha
+        # overall = alpha * pct + beta * concise
 
         table.add_row([
             name,
             f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
-            f"{concise:.2f}%" if concise else "n/a",
+            # f"{optimal_pct:.2f}% ({optimal_score}/{count})" if count else "n/a (0/0)",
+            f"{math.ceil(avg_len_act)}" if avg_len_act != 0 else "n/a",
+            # f"{math.ceil(avg_len_opt)}" if avg_len_opt != 0 else "n/a",
+            # f"{concise:.2f}%" if concise else "n/a",
             # f"{efficiency:.2f}" if efficiency else "n/a",
-            f"{overall:.2f}%" if overall else "n/a",
+            # f"{overall:.2f}%" if overall else "n/a",
             f"{mean:.2f}s" if mean is not None else "n/a",
             f"{median:.2f}s" if median is not None else "n/a",
         ])
