@@ -1,4 +1,5 @@
 import json
+import random
 import asyncio
 from math import log
 from itertools import combinations
@@ -26,6 +27,9 @@ MAX_PARALLEL_EMBED = config.llm_concurrency["embed"]
 
 CLUSTER_SIZE = config.leanrag["cluster_size"]
 
+INITIAL_DELAY = config.llm_retry["initial_delay"]
+MAX_ATTEMPTS = config.llm_retry["max_attempts"]
+
 # DEBUG_LAYER_START = 0
 # DEBUG_LAYER_STOP = 1
 
@@ -52,14 +56,29 @@ logger.setLevel(logging.INFO)
 
 async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
-    async with embed_sem:
-        resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
-    batch_embed = resp['data']
-    # unpack batch to entity_key -> description pairs
-    rows = [
-        EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
-        for emb in sorted(batch_embed, key=lambda e: e.index)
-    ]
+    
+    retry_delay = INITIAL_DELAY
+    for attempt in range(1,MAX_ATTEMPTS+1):
+        try:
+            async with embed_sem:
+                resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
+            batch_embed = resp['data']
+            # unpack batch to entity_key -> description pairs
+            rows = [
+                EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
+                for emb in sorted(batch_embed, key=lambda e: e.index)
+            ]
+            break
+        except Exception as e:
+            if attempt == MAX_ATTEMPTS:
+                error_message = f"Max retry attempts reached. Skipping {len(batch)} descriptions: {e}"
+                logger.error(error_message)
+                raise RuntimeError(error_message)
+            logger.error(f"Embed attempt {attempt} failed for {len(batch)} descriptions. Retrying in {retry_delay}s: {e}")
+            await asyncio.sleep(retry_delay)
+            retry_delay *= 2
+            retry_delay += random.uniform(0, 1)
+
     await acc.extend(rows)
     await pbar.update(len(batch))
 

@@ -143,7 +143,7 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
                     q_st = time.time()
                     info = await miner.retrieve(a, preprocessed_chunks)
                     q_en = time.time()
-                    contained = (await eval.acall(context=info, statement=a)).context_contains_statement
+                    contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
                     queries.append(
                         {
                             "query": a,
