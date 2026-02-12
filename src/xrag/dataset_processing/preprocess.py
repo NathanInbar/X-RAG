@@ -1,5 +1,6 @@
 from pathlib import Path
 import asyncio
+import random
 from asyncio import Semaphore, Lock, Task, create_task, gather
 import litellm
 import dspy
@@ -319,24 +320,28 @@ def process_chunk_text(chunk_text:str) -> Chunk:
     }
     return raw_chunk
 
-async def _embed_batch(chunks:list[Chunk]) -> list[list[float]]:
+async def embed_call_with_retry(to_embed):
     retry_delay = INITIAL_DELAY
-    for attempt in range(1,MAX_ATTEMPTS+1):
+    for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             async with _embed_sem:
-                resp = await litellm.aembedding(model=EMBED_MODEL, input=[c["raw_text"] for c in chunks])
-            break
+                resp = await litellm.aembedding(model=EMBED_MODEL, input=to_embed)
+            return resp
         except Exception as e:
             if attempt == MAX_ATTEMPTS:
-                error_message = f"Max retry attempts reached. Skipping {len(chunks)} descriptions: {e}"
+                error_message = f"Max retry attempts reached. Skipping {len(to_embed)} embeddings: {e}"
                 logger.error(error_message)
                 raise RuntimeError(error_message)
-            logger.error(f"Embed attempt {attempt} failed for {len(chunks)} descriptions. Retrying in {retry_delay}s: {e}")
+            logger.error(f"Embed attempt {attempt} failed for {len(to_embed)} descriptions. Retrying in {retry_delay}s: {e}")
             await asyncio.sleep(retry_delay)
             retry_delay *= 2
             retry_delay += random.uniform(0, 1)
-    
+
+async def _embed_batch(chunks:list[Chunk]) -> list[list[float]]:
+    raw_texts = [c["raw_text"] for c in chunks]
+    resp = await embed_call_with_retry(raw_texts)
     data = resp['data']
+
     if len(data) != len(chunks):
         raise RuntimeError("Embedding count mismatch.. cant map embeddings to owning chunks")
     
