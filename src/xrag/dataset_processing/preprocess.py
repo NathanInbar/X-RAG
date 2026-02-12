@@ -33,8 +33,12 @@ MAX_DESCRIPTION_LENGTH = config.preprocess["max_desc_length"] # max description 
 MAX_CONCURRENT_REQUESTS = config.llm_concurrency["description_gen"] # max concurrent requests for LLM inference
 CHUNK_BATCH_SIZE = config.preprocess["max_desc_chunks"] # how many chunks to process in each batch
 
+INITIAL_DELAY = config.llm_retry["initial_delay"]
+MAX_ATTEMPTS = config.llm_retry["max_attempts"]
+
 _embed_sem = Semaphore(MAX_PARALLEL_EMBED)
 triple_sem = Semaphore(MAX_PARALLEL_EXTRACT)
+
 # - - - - -- - dspy PROMPTS
 
 logger = logging.getLogger(__name__)
@@ -316,8 +320,22 @@ def process_chunk_text(chunk_text:str) -> Chunk:
     return raw_chunk
 
 async def _embed_batch(chunks:list[Chunk]) -> list[list[float]]:
-    async with _embed_sem:
-        resp = await litellm.aembedding(model=EMBED_MODEL, input=[c["raw_text"] for c in chunks])
+    retry_delay = INITIAL_DELAY
+    for attempt in range(1,MAX_ATTEMPTS+1):
+        try:
+            async with _embed_sem:
+                resp = await litellm.aembedding(model=EMBED_MODEL, input=[c["raw_text"] for c in chunks])
+            break
+        except Exception as e:
+            if attempt == MAX_ATTEMPTS:
+                error_message = f"Max retry attempts reached. Skipping {len(chunks)} descriptions: {e}"
+                logger.error(error_message)
+                raise RuntimeError(error_message)
+            logger.error(f"Embed attempt {attempt} failed for {len(chunks)} descriptions. Retrying in {retry_delay}s: {e}")
+            await asyncio.sleep(retry_delay)
+            retry_delay *= 2
+            retry_delay += random.uniform(0, 1)
+    
     data = resp['data']
     if len(data) != len(chunks):
         raise RuntimeError("Embedding count mismatch.. cant map embeddings to owning chunks")

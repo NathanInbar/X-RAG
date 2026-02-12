@@ -62,12 +62,6 @@ async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, 
         try:
             async with embed_sem:
                 resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
-            batch_embed = resp['data']
-            # unpack batch to entity_key -> description pairs
-            rows = [
-                EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
-                for emb in sorted(batch_embed, key=lambda e: e.index)
-            ]
             break
         except Exception as e:
             if attempt == MAX_ATTEMPTS:
@@ -79,6 +73,12 @@ async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, 
             retry_delay *= 2
             retry_delay += random.uniform(0, 1)
 
+    batch_embed = resp['data']
+    # unpack batch to entity_key -> description pairs
+    rows = [
+        EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
+        for emb in sorted(batch_embed, key=lambda e: e.index)
+    ]
     await acc.extend(rows)
     await pbar.update(len(batch))
 

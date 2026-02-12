@@ -8,6 +8,8 @@ from xrag.utils import mg_driver
 from xrag.config import config
 from xrag.dataset_processing.preprocess import process_dataset_file
 
+EVAL_JUDGE = dspy.LM(config.models["eval_judge"])
+
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
         """ Ingest knowledge from some text. """
@@ -136,7 +138,7 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
             # Query + evaluate
             print("Evaluating...")
             queries = []
-            with dspy.context(lm=config.models["eval_judge"]):
+            with dspy.context(lm=EVAL_JUDGE):
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
                     print(f"\rQuery {j+1}/{len(answers)}", end="")
