@@ -245,7 +245,6 @@ def show_results():
             else:
                 r_no_err.append(r)
 
-        print(len(r_no_err))
         score, count = score_count(r_no_err)
         r_conciseness = conciseness(r_no_err)
         mean, median = mean_median_query_time(r_no_err)
