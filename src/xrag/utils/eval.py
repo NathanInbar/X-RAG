@@ -17,6 +17,8 @@ _JUDGE_MODEL = dspy.LM(config.models["eval_judge"])
 _TRIM_MODEL = dspy.LM(config.models["trim_model"])
 _SEGMENTER_MODEL = config.models["segmenter"]
 
+EVAL_JUDGE = dspy.LM(config.models["eval_judge"])
+
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
         """ Ingest knowledge from some text. """
@@ -133,12 +135,21 @@ def conciseness(result):
     actual_length = 0
     count = 0
     for doc in result:
+<<<<<<< HEAD
         # if VERBOSE: print(doc['filename'])
         for i, query in enumerate(doc["queries"]):
             if query["contained"]:
                 # print(f"Measuring conciseness for query {i+1}/15")
                 actual_context = query["context"]
                 # optimal_context = query["optimal_context"]
+=======
+        for query in doc["queries"]:
+            if query["contained"]:
+                length += len(query["context"])
+                count += 1
+
+    return length / count
+>>>>>>> fix_retry
 
                 actual_length += len(actual_context)
                 # optimal_length += len(optimal_context)
@@ -153,6 +164,7 @@ def conciseness(result):
         return 0
    
 
+<<<<<<< HEAD
 def mean_median_query_time(result):
     try:
         times = []
@@ -166,6 +178,17 @@ def mean_median_query_time(result):
     except ZeroDivisionError:
         print(f"ERROR: Could not calculate mean/median query times: no times existed for result")
         return None, None
+=======
+def mean_median_query_time(results):
+    times = []
+    for doc in results:
+        for query in doc["queries"]:
+            times.append(query["duration"])
+    mean = sum(times) / len(times)
+    times.sort()
+    median = times[len(times)//2]
+    return mean, median
+>>>>>>> fix_retry
 
 async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, with_preprocess: bool = False):
     dataset_dir = DATASETS_DIR / dataset
@@ -243,7 +266,11 @@ async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, wit
             # Query + evaluate
             print("Evaluating...")
             queries = []
+<<<<<<< HEAD
             with dspy.context(lm=_JUDGE_MODEL):
+=======
+            with dspy.context(lm=EVAL_JUDGE):
+>>>>>>> fix_retry
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
                     print(f"Query {j+1}/{len(answers)} ...")
@@ -253,6 +280,7 @@ async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, wit
                     else:
                         info = await miner.retrieve(a)
                     q_en = time.time()
+<<<<<<< HEAD
 
                     # optimal_info = trim_to_optimal(info, a)
 
@@ -260,6 +288,9 @@ async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, wit
 
                     # optimal_contained = (await dspy_evaluate.acall(context=optimal_info, statement=a)).context_contains_statement
 
+=======
+                    contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
+>>>>>>> fix_retry
                     queries.append(
                         {
                             "query": a,

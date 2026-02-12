@@ -28,6 +28,9 @@ CLUSTER_SIZE = config.leanrag["cluster_size"]
 INITIAL_DELAY = config.llm_retry["initial_delay"]
 MAX_ATTEMPTS = config.llm_retry["max_attempts"]
 
+INITIAL_DELAY = config.llm_retry["initial_delay"]
+MAX_ATTEMPTS = config.llm_retry["max_attempts"]
+
 # DEBUG_LAYER_START = 0
 # DEBUG_LAYER_STOP = 1
 
@@ -54,27 +57,15 @@ logger.setLevel(logging.INFO)
 
 async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
-    count_no_desc = 0
-    count_empty_desc = 0
-    total_descriptions = len(batch)
-    for e in batch:
-        if not e["desc"]: count_no_desc += 1
-        elif e["desc"] == "" : count_empty_desc += 1
-
+    
     retry_delay = INITIAL_DELAY
-    for attempt in range(MAX_ATTEMPTS):
+    for attempt in range(1,MAX_ATTEMPTS+1):
         try:
             async with embed_sem:
                 resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
-            batch_embed = resp['data']
-            # unpack batch to entity_key -> description pairs
-            rows = [
-                EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
-                for emb in sorted(batch_embed, key=lambda e: e.index)
-            ]
             break
         except Exception as e:
-            if attempt+1 == MAX_ATTEMPTS:
+            if attempt == MAX_ATTEMPTS:
                 error_message = f"Max retry attempts reached. Skipping {len(batch)} descriptions: {e}"
                 logger.error(error_message)
                 raise RuntimeError(error_message)
@@ -83,11 +74,12 @@ async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, 
             retry_delay *= 2
             retry_delay += random.uniform(0, 1)
 
-    if len(rows) != total_descriptions:
-        raise RuntimeError(f"Expected {total_descriptions} embeddings, got {len(rows)}.\n \
-                            Num entities with no description: {count_no_desc}\n \
-                            Num entities with empty description: {count_empty_desc}")
-
+    batch_embed = resp['data']
+    # unpack batch to entity_key -> description pairs
+    rows = [
+        EntityDescEmbed(key=batch[emb.index]["key"],desc_embed=emb.embedding)
+        for emb in sorted(batch_embed, key=lambda e: e.index)
+    ]
     await acc.extend(rows)
     await pbar.update(len(batch))
 

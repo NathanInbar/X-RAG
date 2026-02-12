@@ -1,12 +1,12 @@
 
 import asyncio
 from xrag.utils.eval import evaluate, miner_evaluate_individual
-from xrag.models.leanrag.miner import LeanragMINER
-from xrag.models.parrot.miner import ParrotMINER
-from xrag.models.vector.miner import BasicVectorMINER
-from xrag.models.kggen.miner import KGv2MINER
-from xrag.models.hgr.miner import HypergraphMINER
-from xrag.models.karenrag.miner import KarenMINER
+from xrag.leanrag.miner import LeanragMINER
+from xrag.parrot.miner import ParrotMINER
+from xrag.vector.miner import BasicVectorMINER
+from xrag.kggen.miner import KGv2MINER
+from xrag.hgr.miner import HypergraphMINER
+from xrag.karenrag.miner import KarenMINER
 from xrag.config import config
 
 DATASET = config.dataset
