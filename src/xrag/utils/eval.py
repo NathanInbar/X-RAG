@@ -50,18 +50,19 @@ def conciseness(result):
     """
     length = 0
     count = 0
-    for part in result:
-        for query in part["queries"]:
+    for doc in result:
+        for query in doc["queries"]:
             if query["contained"]:
                 length += len(query["context"])
                 count += 1
+
     return length / count
 
 
-def mean_median_query_time(result):
+def mean_median_query_time(results):
     times = []
-    for part in result:
-        for query in part["queries"]:
+    for doc in results:
+        for query in doc["queries"]:
             times.append(query["duration"])
     mean = sum(times) / len(times)
     times.sort()
@@ -244,6 +245,7 @@ def show_results():
             else:
                 r_no_err.append(r)
 
+        print(len(r_no_err))
         score, count = score_count(r_no_err)
         r_conciseness = conciseness(r_no_err)
         mean, median = mean_median_query_time(r_no_err)
