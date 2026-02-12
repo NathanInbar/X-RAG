@@ -13,6 +13,7 @@ DATASET = config.dataset
 
 if __name__ == "__main__":
     eval_routine = evaluate(
+<<<<<<< HEAD
         [
             # # Parrot
             # miner_evaluate_individual("parrot", ParrotMINER(), DATASET),
@@ -37,6 +38,9 @@ if __name__ == "__main__":
             miner_evaluate_individual("leanrag-ours-test-1", LeanragMINER(), DATASET, True)
 
         ], concurrency=1
+=======
+        [miner_evaluate_individual_with_preprocess("leanrag-ours-test-1", LeanragMINER(), DATASET)], concurrency=1
+>>>>>>> fix_retry
     )
     
     asyncio.run(eval_routine)

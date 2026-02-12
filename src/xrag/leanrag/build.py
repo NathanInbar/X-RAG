@@ -18,6 +18,8 @@ from xrag.utils import (
 from xrag.utils.models import *
 from xrag.config import config
 from xrag.paths import CACHE_DIR
+from xrag.dataset_processing.preprocess import embed_call_with_retry
+
 #TODO: generate + add entity 'type' property
 
 EMBED_MODEL = config.models["embed"]
@@ -57,22 +59,8 @@ logger.setLevel(logging.INFO)
 
 async def batch_embed_descriptions(batch:list[Entity|AggEntity], acc:AsyncList, embed_sem:asyncio.Semaphore, pbar:AsyncProgressBar) -> None:
     """ embed a single batch of entity descriptions """
-    
-    retry_delay = INITIAL_DELAY
-    for attempt in range(1,MAX_ATTEMPTS+1):
-        try:
-            async with embed_sem:
-                resp = await litellm.aembedding(model=EMBED_MODEL, input=[e['desc'] for e in batch])
-            break
-        except Exception as e:
-            if attempt == MAX_ATTEMPTS:
-                error_message = f"Max retry attempts reached. Skipping {len(batch)} descriptions: {e}"
-                logger.error(error_message)
-                raise RuntimeError(error_message)
-            logger.error(f"Embed attempt {attempt} failed for {len(batch)} descriptions. Retrying in {retry_delay}s: {e}")
-            await asyncio.sleep(retry_delay)
-            retry_delay *= 2
-            retry_delay += random.uniform(0, 1)
+    descriptions = [e['desc'] for e in batch]
+    resp = await embed_call_with_retry(descriptions)
 
     batch_embed = resp['data']
     # unpack batch to entity_key -> description pairs
