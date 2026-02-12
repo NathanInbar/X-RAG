@@ -17,7 +17,7 @@ models:
   # description_gen: *nova_pro
   trip_extract: *opus_4pt5
   eval_judge: *opus_4pt5
-  description_gen: *nova_pro
+  description_gen: *opus_4pt5
 
 # maximum concurrent llm calls
 llm_concurrency:
