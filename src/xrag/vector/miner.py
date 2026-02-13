@@ -2,6 +2,7 @@ import litellm
 import numpy as np
 from xrag.utils.eval import MINER
 from xrag.config import config
+from xrag.dataset_processing.preprocess import embed_call_with_retry
 
 class BasicVectorMINER(MINER):
 	""" A MINER implementation for a very simple vector RAG system. """
@@ -22,7 +23,7 @@ class BasicVectorMINER(MINER):
 
 	async def ingest(self, text: str):
 		new_chunks = [text[i*self.chunk_size:(i+1)*self.chunk_size+self.overlap] for i in range(0, len(text)//self.chunk_size)]
-		new_embeddings = await litellm.aembedding(input=new_chunks, model=self.embedding_model)
+		new_embeddings = embed_call_with_retry(new_chunks)
 		new_embeddings = [np.array(e.embedding) for e in new_embeddings.data]
 
 		self.chunks += new_chunks

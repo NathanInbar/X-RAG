@@ -13,11 +13,9 @@ from xrag.dataset_processing.preprocess import process_dataset_file, TextSegment
 VERBOSE = 0
 JUST_ONE = 1
 
-_JUDGE_MODEL = dspy.LM(config.models["eval_judge"])
+JUDGE_MODEL = dspy.LM(config.models["eval_judge"])
 _TRIM_MODEL = dspy.LM(config.models["trim_model"])
-_SEGMENTER_MODEL = config.models["segmenter"]
 
-EVAL_JUDGE = dspy.LM(config.models["eval_judge"])
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -50,80 +48,6 @@ def score_count(result):
             score += int(query["contained"])
     return score, count
 
-class TrimSignature(dspy.Signature):
-    """Trim the context to only include information necessary to answer the query.
-    Remove irrelevant sections while preserving all relevant content exactly as written."""
-    
-    actual_context: str = dspy.InputField(
-        desc = "The full context that may contain both relevant and irrelevant information"
-    )
-    statement: str = dspy.InputField(
-        desc = "The statement that needs to be derived from the context."
-    )
-    optimal_context: str = dspy.OutputField(
-        desc = (
-            "The trimmed context containing only relevant information needed to derive the statement."
-            "If no relevant information exists in the text, make optimal_context empty."
-            "Use the exact wording from the actual_context."
-            "Do not paraphrase, summarize, or rewrite. Remove only the irrelevant sections."
-            "Output plain text with no formatting (bold, italics, or markdown)."
-        )
-    )
-
-
-trim = dspy.Predict(TrimSignature)
-
-
-def chunk_context(text, chunk_size):
-    """Split text into chunks at paragraph/sentence boundaries."""
-    chunks = []
-    current_pos = 0
-    
-    while current_pos < len(text):
-        end_pos = current_pos + chunk_size
-        
-        if end_pos >= len(text):
-            chunks.append(text[current_pos:])
-            break
-        
-        chunk_text = text[current_pos:end_pos]
-        last_break = chunk_text.rfind('\n\n')
-        
-        if last_break > chunk_size * 0.5:
-            end_pos = current_pos + last_break
-        else:
-            last_sentence = max(
-                chunk_text.rfind('. '),
-                chunk_text.rfind('.\n'),
-                chunk_text.rfind('! '),
-                chunk_text.rfind('? ')
-            )
-            if last_sentence > chunk_size * 0.5:
-                end_pos = current_pos + last_sentence + 1
-        
-        chunks.append(text[current_pos:end_pos])
-        current_pos = end_pos
-    
-    return chunks
-
-def trim_to_optimal(context, statement, max_chunk_size = 8000):
-    chunks = chunk_context(context, max_chunk_size)
-    print(f"total chunks: {len(chunks)}")
-    all_optimal = []
-    with dspy.context(lm=_TRIM_MODEL):
-        for context in chunks:
-            result = trim(
-                actual_context=context,
-                statement=statement
-            )
-
-            if not result.optimal_context == '':
-                all_optimal.append(result.optimal_context)
-
-    print(f"total optimal from chunks: {len(all_optimal)}")
-    optimal_context = " ".join(all_optimal)
-    return optimal_context
-
 
 def conciseness(result):
     """ 
@@ -135,50 +59,13 @@ def conciseness(result):
     actual_length = 0
     count = 0
     for doc in result:
-<<<<<<< HEAD
-        # if VERBOSE: print(doc['filename'])
-        for i, query in enumerate(doc["queries"]):
-            if query["contained"]:
-                # print(f"Measuring conciseness for query {i+1}/15")
-                actual_context = query["context"]
-                # optimal_context = query["optimal_context"]
-=======
         for query in doc["queries"]:
             if query["contained"]:
                 length += len(query["context"])
                 count += 1
 
     return length / count
->>>>>>> fix_retry
-
-                actual_length += len(actual_context)
-                # optimal_length += len(optimal_context)
-                count += 1
-
-    try:
-        # avg_optimal = optimal_length / count
-        avg_actual = actual_length / count
-        return avg_actual
-    except ZeroDivisionError:
-        print("ERROR: could not get avg context length, length of input context was 0.")
-        return 0
    
-
-<<<<<<< HEAD
-def mean_median_query_time(result):
-    try:
-        times = []
-        for part in result:
-            for query in part["queries"]:
-                times.append(query["duration"])
-        mean = sum(times) / len(times)
-        times.sort()
-        median = times[len(times)//2]
-        return mean, median
-    except ZeroDivisionError:
-        print(f"ERROR: Could not calculate mean/median query times: no times existed for result")
-        return None, None
-=======
 def mean_median_query_time(results):
     times = []
     for doc in results:
@@ -188,7 +75,6 @@ def mean_median_query_time(results):
     times.sort()
     median = times[len(times)//2]
     return mean, median
->>>>>>> fix_retry
 
 async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, with_preprocess: bool = False):
     dataset_dir = DATASETS_DIR / dataset
@@ -266,11 +152,7 @@ async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, wit
             # Query + evaluate
             print("Evaluating...")
             queries = []
-<<<<<<< HEAD
-            with dspy.context(lm=_JUDGE_MODEL):
-=======
-            with dspy.context(lm=EVAL_JUDGE):
->>>>>>> fix_retry
+            with dspy.context(lm=JUDGE_MODEL):
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
                     print(f"Query {j+1}/{len(answers)} ...")
@@ -280,25 +162,13 @@ async def miner_evaluate_individual(name: str, miner: "MINER", dataset: str, wit
                     else:
                         info = await miner.retrieve(a)
                     q_en = time.time()
-<<<<<<< HEAD
-
-                    # optimal_info = trim_to_optimal(info, a)
-
                     contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
-
-                    # optimal_contained = (await dspy_evaluate.acall(context=optimal_info, statement=a)).context_contains_statement
-
-=======
-                    contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
->>>>>>> fix_retry
                     queries.append(
                         {
                             "query": a,
                             "context": info,           
                             "contained": contained,
                             "duration": q_en - q_st,
-                            # "optimal_context": optimal_info,
-                            # "optimal_contained": optimal_contained
                         }
                     )
                 print("")
