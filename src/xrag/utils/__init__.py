@@ -90,17 +90,35 @@ class Tokenizer:
 from typing import Sequence
 import numpy as np
 from sklearn.mixture import GaussianMixture
-import umap
+from sklearn.decomposition import PCA
+
+try:  # UMAP pulls in numba/llvmlite which aren't available on Python 3.12 yet.
+    import umap
+except ImportError:  # pragma: no cover - only hit when UMAP isn't installed.
+    umap = None
 
 def reduce_embeddings(embeddings:np.ndarray, reduction_dim=2, random_state=0):
-    # LeanRAG reduces dimensionality with UMAP before clustering.
+    # LeanRAG reduces dimensionality before clustering; prefer UMAP when it's available.
+    if embeddings.size == 0:
+        return embeddings
+
     target_dim = min(reduction_dim, embeddings.shape[0] - 2) if embeddings.shape[0] > 2 else 1
-    reducer = umap.UMAP(
-        n_components=target_dim,
-        n_neighbors=15,
-        metric="cosine",
-        random_state=random_state,
-    )
+    target_dim = max(1, target_dim)
+
+    if umap is not None:
+        reducer = umap.UMAP(
+            n_components=target_dim,
+            n_neighbors=15,
+            metric="cosine",
+            random_state=random_state,
+        )
+        return reducer.fit_transform(embeddings)
+
+    # Fall back to PCA so Python 3.12 environments (where UMAP can't be installed)
+    # still get deterministic dimensionality reduction for clustering.
+    max_components = max(1, min(embeddings.shape[0], embeddings.shape[1]))
+    fallback_dim = min(target_dim, max_components)
+    reducer = PCA(n_components=fallback_dim, random_state=random_state)
     return reducer.fit_transform(embeddings)
 
 def get_optimal_clusters_from_embeddings(
