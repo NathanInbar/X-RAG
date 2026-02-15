@@ -6,12 +6,15 @@ Blah blah blah .. introduction
       \item item1
 \end{itemize}
 
-\textbf{Paper outline.}
-Section~\ref{sec:related-work} reviews related work.
-Section~\ref{sec:methods} describes the compared RAG methods and our unified
-implementation assumptions.
-Section~\ref{sec:setup} presents datasets, incremental ingestion regimes, and
-metrics.
-Section~\ref{sec:results} reports results and analysis.
-Section~\ref{sec:conclusion} concludes with recommendations.
+\textbf{Paper outline (drafting)}
 
+- talk about how graph rag methods construct and then retrieve knowledge. then that 
+becomes the context that goes into the LLM for answering the query.
+
+\textbf{Evaluation Metrics}
+
+- context sufficiency score: For each method, we compute the percentage of answers for which the
+LLM judge found that the retrieved context sufficiently included the information. A higher
+sufficiency percentage means the method usually finds the necessary information.
+
+- average context length: 

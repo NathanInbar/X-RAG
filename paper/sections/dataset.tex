@@ -1,0 +1,21 @@
+\section {Dataset}
+(description of the dataset we created):
+We constructed a dataset from an archive of scientific papers, intended to
+mimic the MINE dataset format. 
+
+\textbf{Article Pre-Processing}
+
+... (motivations for pre processing the data) ...
+
+- important for chunking with SaT- line breaks increase the SaT model
+prediction for chunk borders, resulting in lots of tiny chunks.
+
+
+We pre-process the data by extracting the raw text from each PDF article, converting
+it to markdown using the pymupdf4llm python library. We then perform a series of text
+sanitization steps, normalizing line breaks and whitespaces that appear consistently
+in research article text.
+
+\textbf{Evaluation Query Synthesis}
+
+... (mention the procedure that Annie used for creating our dataset?) ...
