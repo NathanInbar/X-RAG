@@ -4,6 +4,7 @@ from pprint import pprint
 from paths import DATASETS_DIR
 from enum import Enum
 from pydantic import BaseModel, field_validator
+from tqdm import tqdm
 
 OUTPUT_DIR = DATASETS_DIR / "QASPER"
 if not OUTPUT_DIR.is_dir():
@@ -28,6 +29,7 @@ class TopicBackground(str,Enum):
 class PaperRead(str,Enum):
     YES = "yes"
     NO = "no"
+    SOMEWHAT = "somewhat"
 
 def empty_string_to_none(v):
     return None if v == "" else v
@@ -160,7 +162,7 @@ def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
 
 
 ds = load_dataset("allenai/qasper", split="validation")
-for raw in ds:
+for raw in tqdm(ds):
 
     #qas.answers.0.unanswerable -> missing
     #qas.answers.0.extractive_spans -> missing
@@ -184,10 +186,3 @@ for raw in ds:
     # - save it to the output directory
     with output_path.open("w") as f:
         json.dump(minelike_article.model_dump(), f)
-
-    print(f"ARTICLE:\n{minelike_article}")
-
-    break #TEMP: stop at ds0
-
-# TODO: 
-# -- caching: (only for id.json not in dataset dir)
