@@ -7,6 +7,10 @@ from prettytable import PrettyTable
 from xrag.utils import mg_driver
 from xrag.config import config
 from xrag.dataset_processing.preprocess import process_dataset_file
+import traceback
+
+EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
+
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -136,7 +140,7 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
             # Query + evaluate
             print("Evaluating...")
             queries = []
-            with dspy.context(lm=config.models["eval_judge"]):
+            with dspy.context(lm=EVAL_JUDGE_LM):
                 answers = mine_data.get("answers", [])
                 for j, a in enumerate(answers):
                     print(f"\rQuery {j+1}/{len(answers)}", end="")
@@ -163,7 +167,10 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
             await miner.reset()
 
         except Exception as e:
-            result = {"filename": p.name, "error": str(e)}
+            tb = e.__traceback__
+            last = traceback.extract_tb(tb)
+            result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
+            raise e 
             print(f"ERROR: {str(e)}")
             try:
                 await miner.reset()
