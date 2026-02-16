@@ -83,12 +83,18 @@ class QasperRow(BaseModel):
     qas: QAs
     figures_and_tables:FiguresAndTables
 
+# - - - - - - -  - - - - - - -  - - - - - - - 
+
+class QasperMineLike(BaseModel):
+    essay:str
+    queries:list[str]
+    answers:list[Answer]
 
 def flatten_article_content(full_text:FullText) -> str:
     """ flatten a QASPER article entry into a single string """
 
     content = ""
-    for section_name, paragraph in zip(full_text['section_name'], full_text['paragraphs']):
+    for section_name, paragraph in zip(full_text.section_name, full_text.paragraphs):
         # section header:
         # count number of ':::' -> how many hashes to prepend
         sep_count = section_name.count(':::')
@@ -100,8 +106,27 @@ def flatten_article_content(full_text:FullText) -> str:
 
     return content
 
-def qasper_row_to_mine(row):
-    ...
+def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
+
+    essay_content = flatten_article_content(row.full_text)
+    
+    # NOTE: possible to filter questions by background experience , paper read, etc
+    queries:list[str] = row.qas.question 
+    answers:list[Answer] = [x.answer for x in row.qas.answers]
+
+    if len(queries) != len(answers):
+        raise RuntimeError(f"Number of queries != number of answers for row: {row.id}")
+
+    out:QasperMineLike = QasperMineLike.model_construct(
+        {
+            "essay": essay_content,
+            "queries": queries,
+            "answers": answers,
+        }
+    )
+
+    return out
+
 
 
 ds = load_dataset("allenai/qasper", split="validation")
@@ -116,19 +141,15 @@ for raw in ds:
     # break 
 
     row = QasperRow.model_validate(raw)
-    print(row)
+    # print(row)
+
+    # - flatten article content and create mine-like json object
+    minelike_article = qasper_row_to_mine(row)
+    
+    # - save it to the output directory
+    print(minelike_article)
 
     break #TEMP: stop at ds0
 
 # TODO: 
-# - row -> QasperRow
-# - flatten article content and create mine-like json object
-# - save it to the output directory
 # -- caching: (only for id.json not in dataset dir)
-
-
-# pprint(ds0['full_text'])
-# print(len(ds0['full_text']['section_name']))
-# print(len(ds0['full_text']['paragraphs']))
-
-# ds0 = ds[0]
