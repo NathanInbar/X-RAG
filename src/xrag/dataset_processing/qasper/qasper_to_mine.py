@@ -15,6 +15,13 @@ class FullText(BaseModel):
     section_name: list[str]
     paragraphs: list[list[str]]
 
+    @field_validator("section_name", mode="before")
+    @classmethod
+    def fill_missing_section_names(cls, v):
+        if v is None:
+            return []
+        return ["" if name is None else name for name in v]
+
 class NLPBackground(str,Enum):
     ZERO = "zero"
     TWO = "two"
