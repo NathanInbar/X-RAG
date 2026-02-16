@@ -261,8 +261,8 @@ def show_results():
         table.add_row([
             name,
             f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
-            f"{concise:.8f}" if concise else "n/a",
-            f"{efficiency:.2f}" if efficiency else "n/a",
+            f"{concise:.2f}" if concise else "n/a",
+            f"{efficiency:.8f}" if efficiency else "n/a",
             f"{mean:.2f}s" if mean is not None else "n/a",
             f"{median:.2f}s" if median is not None else "n/a",
         ])

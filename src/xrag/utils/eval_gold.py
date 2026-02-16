@@ -16,7 +16,6 @@ from statistics import mean
 EMBED_MODEL = config.models["embed"]
 EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
 
-dspy.configure(lm=EVAL_JUDGE_LM)
 ### INSERT DSPY SIGNATURES HERE :
 
 class _EvalSignature(dspy.Signature):
@@ -125,26 +124,27 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
             queries = mine_data.get("queries", [])
             gold_answers = mine_data.get("answers", [])
 
-            for j, (query, gold_answer) in enumerate(zip(queries, gold_answers)):
-                print(f"\rQuery {j+1}/{len(queries)}", end="")
-                q_st = time.time()
-                context = await miner.retrieve(query, preprocessed_chunks)
-                q_en = time.time()
-            
-                ### INSERT QUERY EVALUATION ALGORITHM HERE:
-                ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
-                ### (NOTE:) TO EMBED: CALL resp = await litellm.aembedding(model=EMBED_MODEL, input = my_string or for batch [str1,str2,...]) THEN USE resp['data]
+            with dspy.context(lm=EVAL_JUDGE_LM):
+                for j, (query, gold_answer) in enumerate(zip(queries, gold_answers)):
+                    print(f"\rQuery {j+1}/{len(queries)}", end="")
+                    q_st = time.time()
+                    context = await miner.retrieve(query, preprocessed_chunks)
+                    q_en = time.time()
+                
+                    ### INSERT QUERY EVALUATION ALGORITHM HERE:
+                    ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
+                    ### (NOTE:) TO EMBED: CALL resp = await litellm.aembedding(model=EMBED_MODEL, input = my_string or for batch [str1,str2,...]) THEN USE resp['data]
 
-                eval = await pred_answer_eval.acall(query=query, context=context, gold_answer=gold_answer['text'])
+                    eval = await pred_answer_eval.acall(query=query, context=context, gold_answer=gold_answer['text'])
 
-                query_results.append(
-                    {
-                        "query": query,
-                        "context": context,
-                        "duration": q_en - q_st,
-                        "contained": eval.is_supported # should be 'supported' but this is temp for compatibility with old evaluate()
-                    }
-                )
+                    query_results.append(
+                        {
+                            "query": query,
+                            "context": context,
+                            "duration": q_en - q_st,
+                            "contained": eval.is_supported # should be 'supported' but this is temp for compatibility with old evaluate()
+                        }
+                    )
                 print("")
 
             result = {
