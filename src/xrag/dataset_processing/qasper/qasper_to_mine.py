@@ -1,3 +1,4 @@
+import argparse
 import json
 from datasets import load_dataset
 from pprint import pprint
@@ -105,6 +106,8 @@ class AnswerType(str, Enum):
 class SimplifiedAnswer(BaseModel):
     answer_type: AnswerType
     text: str | None
+    evidence: list[str]
+    highlighted_evidence: list[str]
 
 
 class QasperMineLike(BaseModel):
@@ -118,18 +121,40 @@ def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
 
     for answer in container.answer:
         if answer.unanswerable:
-            return SimplifiedAnswer(answer_type=AnswerType.UNANSWERABLE, text=None)
+            return SimplifiedAnswer(
+                answer_type=AnswerType.UNANSWERABLE,
+                text=None,
+                evidence=answer.evidence,
+                highlighted_evidence=answer.highlighted_evidence,
+            )
         if answer.free_form_answer:
-            return SimplifiedAnswer(answer_type=AnswerType.FREE_FORM, text=answer.free_form_answer)
+            return SimplifiedAnswer(
+                answer_type=AnswerType.FREE_FORM,
+                text=answer.free_form_answer,
+                evidence=answer.evidence,
+                highlighted_evidence=answer.highlighted_evidence,
+            )
         if answer.extractive_spans:
             return SimplifiedAnswer(
                 answer_type=AnswerType.EXTRACTIVE_SPANS,
                 text="\n".join(answer.extractive_spans),
+                evidence=answer.evidence,
+                highlighted_evidence=answer.highlighted_evidence,
             )
         if answer.yes_no is not None:
             normalized = "yes" if answer.yes_no else "no"
-            return SimplifiedAnswer(answer_type=AnswerType.YES_NO, text=normalized)
-    return SimplifiedAnswer(answer_type=AnswerType.UNANSWERABLE, text=None)
+            return SimplifiedAnswer(
+                answer_type=AnswerType.YES_NO,
+                text=normalized,
+                evidence=answer.evidence,
+                highlighted_evidence=answer.highlighted_evidence,
+            )
+    return SimplifiedAnswer(
+        answer_type=AnswerType.UNANSWERABLE,
+        text=None,
+        evidence=[],
+        highlighted_evidence=[],
+    )
 
 def flatten_article_content(full_text:FullText) -> str:
     """ flatten a QASPER article entry into a single string """
@@ -168,28 +193,28 @@ def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
 
 
 
-ds = load_dataset("allenai/qasper", split="validation")
-for raw in tqdm(ds):
+def main(ignore_cache: bool = False):
+    ds = load_dataset("allenai/qasper", split="validation")
+    for raw in tqdm(ds):
+        row = QasperRow.model_validate(raw)
 
-    #qas.answers.0.unanswerable -> missing
-    #qas.answers.0.extractive_spans -> missing
-    #... yes_no, free_form_answer, evidence, highlighted evidence
+        normalized_id = row.id.replace(".", "_")
+        output_path = OUTPUT_DIR / f"{normalized_id}.json"
+        if output_path.exists() and not ignore_cache:
+            continue
 
-    # print(raw['qas']['answers'][0])
+        minelike_article = qasper_row_to_mine(row)
 
-    # break 
+        with output_path.open("w") as f:
+            json.dump(minelike_article.model_dump(), f)
 
-    row = QasperRow.model_validate(raw)
-    # print(row)
 
-    normalized_id = row.id.replace(".", "_")
-    output_path = OUTPUT_DIR / f"{normalized_id}.json"
-    if output_path.exists():
-        continue
-
-    # - flatten article content and create mine-like json object
-    minelike_article = qasper_row_to_mine(row)
-
-    # - save it to the output directory
-    with output_path.open("w") as f:
-        json.dump(minelike_article.model_dump(), f)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Convert QASPER rows into simplified JSON files")
+    parser.add_argument(
+        "--ignore-cache",
+        action="store_true",
+        help="Reprocess all rows even if cached JSON already exists",
+    )
+    args = parser.parse_args()
+    main(ignore_cache=args.ignore_cache)
