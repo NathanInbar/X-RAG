@@ -1,3 +1,4 @@
+import json
 from datasets import load_dataset
 from pprint import pprint
 from paths import DATASETS_DIR
@@ -88,7 +89,22 @@ class QasperRow(BaseModel):
 class QasperMineLike(BaseModel):
     essay:str
     queries:list[str]
-    answers:list[Answer]
+    answers:list[str]
+
+
+def answer_container_to_text(container: AnswerContainer) -> str:
+    """Convert all annotations for a question into a single textual answer."""
+
+    for answer in container.answer:
+        if answer.unanswerable:
+            return "unanswerable"
+        if answer.free_form_answer:
+            return answer.free_form_answer
+        if answer.extractive_spans:
+            return "\n".join(answer.extractive_spans)
+        if answer.yes_no is not None:
+            return "yes" if answer.yes_no else "no"
+    return ""
 
 def flatten_article_content(full_text:FullText) -> str:
     """ flatten a QASPER article entry into a single string """
@@ -112,17 +128,15 @@ def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
     
     # NOTE: possible to filter questions by background experience , paper read, etc
     queries:list[str] = row.qas.question 
-    answers:list[Answer] = [x.answer for x in row.qas.answers]
+    answers:list[str] = [answer_container_to_text(x) for x in row.qas.answers]
 
     if len(queries) != len(answers):
         raise RuntimeError(f"Number of queries != number of answers for row: {row.id}")
 
-    out:QasperMineLike = QasperMineLike.model_construct(
-        {
-            "essay": essay_content,
-            "queries": queries,
-            "answers": answers,
-        }
+    out = QasperMineLike(
+        essay=essay_content,
+        queries=queries,
+        answers=answers,
     )
 
     return out
@@ -143,11 +157,19 @@ for raw in ds:
     row = QasperRow.model_validate(raw)
     # print(row)
 
+    normalized_id = row.id.replace(".", "_")
+    output_path = OUTPUT_DIR / f"{normalized_id}.json"
+    if output_path.exists():
+        continue
+
     # - flatten article content and create mine-like json object
     minelike_article = qasper_row_to_mine(row)
-    
+
     # - save it to the output directory
-    print(minelike_article)
+    with output_path.open("w") as f:
+        json.dump(minelike_article.model_dump(), f)
+
+    print(f"ARTICLE:\n{minelike_article}")
 
     break #TEMP: stop at ds0
 
