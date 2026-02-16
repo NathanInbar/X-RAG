@@ -2,24 +2,21 @@ from datasets import load_dataset
 from pprint import pprint
 from paths import DATASETS_DIR
 from enum import Enum
+from pydantic import BaseModel, field_validator
 
 OUTPUT_DIR = DATASETS_DIR / "QASPER"
 if not OUTPUT_DIR.is_dir():
     OUTPUT_DIR.mkdir()
 
-ds = load_dataset("allenai/qasper", split="validation")
-
-ds0 = ds[0]
-
-from pydantic import BaseModel
 
 class FullText(BaseModel):
     section_name: list[str]
-    paragraphs: list[str]
+    paragraphs: list[list[str]]
 
 class NLPBackground(str,Enum):
     ZERO = "zero"
     TWO = "two"
+    FIVE = "five"
     INF = "infinity"
 
 class TopicBackground(str,Enum):
@@ -31,26 +28,47 @@ class PaperRead(str,Enum):
     YES = "yes"
     NO = "no"
 
+def empty_string_to_none(v):
+    return None if v == "" else v
+
 class Answer(BaseModel):
-    unanswerable:bool
+    unanswerable: bool
 
     # exactly one of these three will be non-empty (if answerable)
-    extractive_spans:list ### spans in the paper which serve as the answer
-    yes_no: bool|None
-    free_form_answer: str
-    
-    evidence: list[str] # full paragraph
-    highlighted_evidence: list[str] # highlights from those paragraphs
+    extractive_spans: list[str]
+    yes_no: bool | None
+    free_form_answer: str | None
+
+    evidence: list[str]  # full paragraph
+    highlighted_evidence: list[str]  # highlights from those paragraphs
+
+    @field_validator("yes_no", "free_form_answer", mode="before")
+
+    @classmethod
+    def normalize_empty(cls, v):
+        return empty_string_to_none(v)
+
+class AnswerContainer(BaseModel):
+    annotation_id: list[str]
+    answer: list[Answer]
+    worker_id: list[str]
 
 class QAs(BaseModel):
     question:list[str]
     question_id:list[str]
-    nlp_background:list[NLPBackground]
-    topic_background:list[TopicBackground]
-    paper_read:list[PaperRead]
-    search_query:list[str]
+    nlp_background:list[NLPBackground|None]
+    topic_background:list[TopicBackground|None]
+    paper_read:list[PaperRead|None]
+    search_query:list[str | None]
     question_writer:list[str]
-    answers:list[Answer]
+    answers:list[AnswerContainer]
+
+    @field_validator("nlp_background", "topic_background", "paper_read", "search_query", mode="before")
+    @classmethod
+    def normalize_empty(cls, v):
+        if v is None:
+            return None
+        return [empty_string_to_none(item) for item in v]
 
 
 class FiguresAndTables(BaseModel):
@@ -85,7 +103,23 @@ def flatten_article_content(full_text:FullText) -> str:
 def qasper_row_to_mine(row):
     ...
 
-    
+
+ds = load_dataset("allenai/qasper", split="validation")
+for raw in ds:
+
+    #qas.answers.0.unanswerable -> missing
+    #qas.answers.0.extractive_spans -> missing
+    #... yes_no, free_form_answer, evidence, highlighted evidence
+
+    # print(raw['qas']['answers'][0])
+
+    # break 
+
+    row = QasperRow.model_validate(raw)
+    print(row)
+
+    break #TEMP: stop at ds0
+
 # TODO: 
 # - row -> QasperRow
 # - flatten article content and create mine-like json object
@@ -93,7 +127,8 @@ def qasper_row_to_mine(row):
 # -- caching: (only for id.json not in dataset dir)
 
 
-
 # pprint(ds0['full_text'])
 # print(len(ds0['full_text']['section_name']))
 # print(len(ds0['full_text']['paragraphs']))
+
+# ds0 = ds[0]
