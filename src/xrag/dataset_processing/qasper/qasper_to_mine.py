@@ -86,25 +86,41 @@ class QasperRow(BaseModel):
 
 # - - - - - - -  - - - - - - -  - - - - - - - 
 
+class AnswerType(str, Enum):
+    UNANSWERABLE = "unanswerable"
+    FREE_FORM = "free_form"
+    EXTRACTIVE_SPANS = "extractive_spans"
+    YES_NO = "yes_no"
+
+
+class SimplifiedAnswer(BaseModel):
+    answer_type: AnswerType
+    text: str | None
+
+
 class QasperMineLike(BaseModel):
     essay:str
     queries:list[str]
-    answers:list[str]
+    answers:list[SimplifiedAnswer]
 
 
-def answer_container_to_text(container: AnswerContainer) -> str:
-    """Convert all annotations for a question into a single textual answer."""
+def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
+    """Convert all annotations for a question into a single simplified answer."""
 
     for answer in container.answer:
         if answer.unanswerable:
-            return "unanswerable"
+            return SimplifiedAnswer(answer_type=AnswerType.UNANSWERABLE, text=None)
         if answer.free_form_answer:
-            return answer.free_form_answer
+            return SimplifiedAnswer(answer_type=AnswerType.FREE_FORM, text=answer.free_form_answer)
         if answer.extractive_spans:
-            return "\n".join(answer.extractive_spans)
+            return SimplifiedAnswer(
+                answer_type=AnswerType.EXTRACTIVE_SPANS,
+                text="\n".join(answer.extractive_spans),
+            )
         if answer.yes_no is not None:
-            return "yes" if answer.yes_no else "no"
-    return ""
+            normalized = "yes" if answer.yes_no else "no"
+            return SimplifiedAnswer(answer_type=AnswerType.YES_NO, text=normalized)
+    return SimplifiedAnswer(answer_type=AnswerType.UNANSWERABLE, text=None)
 
 def flatten_article_content(full_text:FullText) -> str:
     """ flatten a QASPER article entry into a single string """
@@ -128,7 +144,7 @@ def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
     
     # NOTE: possible to filter questions by background experience , paper read, etc
     queries:list[str] = row.qas.question 
-    answers:list[str] = [answer_container_to_text(x) for x in row.qas.answers]
+    answers:list[SimplifiedAnswer] = [answer_container_to_simple(x) for x in row.qas.answers]
 
     if len(queries) != len(answers):
         raise RuntimeError(f"Number of queries != number of answers for row: {row.id}")
