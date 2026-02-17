@@ -4,7 +4,7 @@ import time
 import dspy
 from aiolimiter import AsyncLimiter
 from prettytable import PrettyTable
-from xrag.utils import mg_driver
+from xrag.utils import mg_driver, batched
 from xrag.config import config
 from xrag.utils.eval import MINER
 from xrag.utils import Tokenizer
@@ -12,41 +12,109 @@ from xrag.dataset_processing.preprocess import process_dataset_file
 import litellm
 import traceback
 from statistics import mean
+import numpy as np
 
 EMBED_MODEL = config.models["embed"]
 EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
 
-### INSERT DSPY SIGNATURES HERE :
+def score_count(result):
+    """ Computes total score and count. """
+    score = 0
+    count = 0
+    for part in result:
+        for query in part["queries"]:
+            count += 1
+            score += int(query["is_constructible"])
+    return score, count
+
+
+def conciseness(result):
+    """ 
+    For each "correct" response, how long is it? 
+    
+    Note: Having only one correct response that is concise will give a "good" score for this. 
+    """
+    length = 0
+    count = 0
+    for part in result:
+        for query in part["queries"]:
+            if query["is_constructible"]:
+                length += len(query["context"])
+                count += 1
+    return length / count
+
+def eval_metrics(result):
+    rs_vals = []
+    ge_vals = []
+    f1_vals = []
+
+    for part in result:
+        for query in part["queries"]:
+            rs_vals.append(query["evidence_recall"])
+            ge_vals.append(query["mean_gold_sim"])   # adjust if needed
+            f1_vals.append(query["evidence_f1"])
+
+    if len(f1_vals) == 0:
+        return 0.0, 0.0, 0.0, 0.0, (0.0, 0.0)
+
+    rs_vals = np.array(rs_vals, dtype=float)
+    ge_vals = np.array(ge_vals, dtype=float)
+    f1_vals = np.array(f1_vals, dtype=float)
+
+    mean_rs = float(rs_vals.mean())
+    mean_ge = float(ge_vals.mean())
+    mean_f1 = float(f1_vals.mean())
+
+    median_f1 = float(np.median(f1_vals))
+    q1 = float(np.percentile(f1_vals, 25))
+    q3 = float(np.percentile(f1_vals, 75))
+    iqr_f1 = q3 - q1
+
+    return mean_f1, mean_rs, mean_ge, median_f1, iqr_f1
+
+def mean_median_query_time(result):
+    times = []
+    for part in result:
+        for query in part["queries"]:
+            times.append(query["duration"])
+    mean = sum(times) / len(times)
+    times.sort()
+    median = times[len(times)//2]
+    return mean, median
 
 class _EvalSignature(dspy.Signature):
     """
-    You are evaluating whether a retrieved context sufficiently supports a gold answer to a query.
+    You are a strict judge evaluating whether the GOLD answer can be constructed from the retrieved context.
 
-    Given:
-    - A query.
-    - A gold_answer (this is the correct answer).
-    - A retrieved context (this is the only information allowed).
+    Inputs:
+    - query: the question being asked.
+    - gold_answer: the gold answer text (free-form or extractive span text).
+    - retrieved_context: the context produced by a retrieval method (may contain summaries and/or excerpts).
 
-    Determine whether the context contains enough information to support the gold_answer.
+    Task:
+    Return True if, using ONLY the retrieved_context, a careful reader could produce an answer that matches the
+    gold_answer in meaning (or contains it, for extractive-style answers). Otherwise return False.
 
     Rules:
-    1. Use ONLY the provided context. Do not use external knowledge.
-    2. If the gold_answer represents "unanswerable", return True only if the context clearly lacks sufficient information to answer the query.
-    3. For yes/no answers, return True only if the context clearly entails the gold yes/no decision.
-    4. For free-form answers, return True only if the essential claims of the gold_answer are directly supported by the context.
-    5. If the context is ambiguous, incomplete, or only partially supports the gold_answer, return False.
-    6. If the gold_answer contains information not present in the context, return False.
+    1) Use ONLY retrieved_context. Do NOT use outside knowledge.
+    2) If the needed facts are missing, unclear, or require guessing, return False.
+    3) If retrieved_context contradicts gold_answer, return False.
+    4) If gold_answer is a short span, it must be explicitly present in retrieved_context or unambiguously stated
+       with equivalent wording.
+    5) If gold_answer is longer free-form text, the essential claims must be supported by retrieved_context.
 
     Output:
-    - is_supported: True or False
+    - is_constructible: boolean only.
     """
 
-    query:str = dspy.InputField(desc="")
-    gold_answer:str = dspy.InputField(desc="")
-    context:str = dspy.InputField(desc="")
+    query: str = dspy.InputField(desc="The question being asked.")
+    gold_answer: str = dspy.InputField(desc="Gold answer text (free-form or extractive span).")
+    retrieved_context: str = dspy.InputField(desc="Retrieved context; the only allowed evidence.")
 
-    is_supported:bool = dspy.OutputField(desc="")
-    # unsupported_claims_count:int = dspy.OutputField()
+    is_constructible: bool = dspy.OutputField(
+        desc="True if the gold_answer is constructible from retrieved_context alone; otherwise False."
+    )
+
 ###
 pred_answer_eval = dspy.Predict(_EvalSignature)
 
@@ -126,23 +194,70 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
 
             with dspy.context(lm=EVAL_JUDGE_LM):
                 for j, (query, gold_answer) in enumerate(zip(queries, gold_answers)):
+
+                    # skip where answer is unanswerable or yes/no
+                    if gold_answer["answer_type"] not in ["free_form", "extractive_spans"]: continue
+                    # skip where author has low nlp background experience:
+                    if gold_answer["nlp_background"] == "zero": continue
+
+                    # graphrag retrieval
                     print(f"\rQuery {j+1}/{len(queries)}", end="")
                     q_st = time.time()
-                    context = await miner.retrieve(query, preprocessed_chunks)
+                    context:str = await miner.retrieve(query, preprocessed_chunks)
                     q_en = time.time()
                 
                     ### INSERT QUERY EVALUATION ALGORITHM HERE:
                     ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
                     ### (NOTE:) TO EMBED: CALL resp = await litellm.aembedding(model=EMBED_MODEL, input = my_string or for batch [str1,str2,...]) THEN USE resp['data]
 
-                    eval = await pred_answer_eval.acall(query=query, context=context, gold_answer=gold_answer['text'])
+                    # 1. Evidence F1, R-S, G-E
+                    gold_evidence:list[str] = gold_answer["evidence"]
+                    if gold_evidence is None:
+                        print("WARNING: found answer with no evidence. skipping")
+                        continue
+                
+                    resp = await litellm.aembedding(model=EMBED_MODEL, input=gold_evidence)
+                    G = np.array([row["embedding"] for row in resp["data"]], dtype=np.float32)
+
+                    context_split:list[str] = context.splitlines()
+                    ctx_vecs = []
+                    for batch in batched(context_split, 25):
+                        resp = await litellm.aembedding(model=EMBED_MODEL, input=batch)
+                        ctx_vecs.extend([row["embedding"] for row in resp["data"]])
+                    C = np.array(ctx_vecs, dtype=np.float32)
+
+                    eps= 1e-12
+                    # normalize & compute similarity matrix
+                    G_norm = (G / np.linalg.norm(G, axis=1, keepdims=True) + eps)
+                    C_norm = (C / np.linalg.norm(C, axis=1, keepdims=True) + eps)
+
+                    sim_matrix = G_norm @ C_norm.T
+
+                    # semantic matching: gold evidence <-> context splits
+                    max_sim_per_gold = sim_matrix.max(axis=1)
+                    tau = 0.8
+
+                    recall = float((max_sim_per_gold >= tau).sum() / len(max_sim_per_gold))
+                    max_sim_per_ctx = sim_matrix.max(axis=0)
+                    precision = float((max_sim_per_ctx >= tau).sum() / len(max_sim_per_ctx))
+                    f1 = 0.0 if (precision + recall) == 0 else float(2 * precision * recall / (precision + recall))
+
+
+                    # 2. can the answer be constructed from the context?: yes/no
+                    is_constructible = (await pred_answer_eval.acall(
+                        query=query, gold_answer=gold_answer["text"], retrieved_context=context)).is_constructible
 
                     query_results.append(
                         {
                             "query": query,
                             "context": context,
                             "duration": q_en - q_st,
-                            "contained": eval.is_supported # should be 'supported' but this is temp for compatibility with old evaluate()
+                            "evidence_recall": recall,
+                            "evidence_precision": precision,
+                            "evidence_f1": f1,
+                            "mean_gold_sim": float(max_sim_per_gold.mean()),
+                            "min_gold_sim": float(max_sim_per_gold.min()),
+                            "is_constructible": is_constructible
                         }
                     )
                 print("")
@@ -172,59 +287,104 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
         _atomic_save()
         print(f"wrote result to {result_file}")
 
+async def evaluate(
+    eval_itms: list[callable],
+    concurrency: int = 3,
+):
+    await mg_driver.init()
+    limiter = AsyncLimiter(concurrency)
+    async def limited(f):
+        async with limiter:
+            return await f
+
+    print(f"Running {len(eval_itms)} evaluations with concurrency {concurrency}")
+    [await f for f in eval_itms]
+    print("Done!")
+
+    show_results()
 
 
-############## EVAL IDEA:
-    # class GenerateAnswerWithContext(dspy.Signature):
-    #     """  """
-    #     query:str = dspy.InputField()
-    #     context:str = dspy.InputField()
+def show_results():
+    errors = []
+    table = PrettyTable()
+    table.field_names = [
+        "Name",
+        "Score",
+        "Context Length",
+        "Conciseness",
+        "Query Duration (mean)",
+        "Query Duration (median)",
+        "Mean F1",
+        "Mean RS",
+        "Mean GE",
+        "Median F1",
+        "IQR F1"
+    ]
 
-    #     is_unanswerable:bool = dspy.OutputField()
-    #     answer_type:str = dspy.OutputField()
-    #     yes_no:bool|None = dspy.OutputField()
-    #     free_form:str = dspy.OutputField()
-    #     rationale_quote:str = dspy.OutputField()
+    for f in RESULTS_DIR.iterdir():
+        if not f.is_file() or f.suffix.lower() != ".json":
+            continue
 
-    # dspy_generate_answer = dspy.Predict(GenerateAnswerWithContext)
-    # TAU = ... #similarity thresh
+        print(f"Reading {f} ...")
+        try:
+            with open(f, "r", encoding="utf-8") as fp:
+                data = json.load(fp)
+        except Exception as e:
+            errors.append({"filename": f.name, "error": f"failed to load results json: {e}"})
+            continue
 
-# . . . . . . . . . . . .
+        # tolerate either {"name":..., "result":[...]} or a bare list (older files)
+        if isinstance(data, dict):
+            name = data.get("name", f.stem)
+            results = data.get("result", [])
+        elif isinstance(data, list):
+            name = f.stem
+            results = data
+        else:
+            errors.append({"filename": f.name, "error": f"unexpected json root type: {type(data)}"})
+            continue
 
-    # ctx_toks = Tokenizer.encode(context)
-    # len_ctx_chars, ctx_toks = len(context), len(ctx_toks)
+        if not isinstance(results, list):
+            errors.append({"filename": f.name, "error": "missing/invalid 'result' list"})
+            continue
 
-    # # Evidence coverage metrics:
-    # ctx_segments: list[str] = ... # split on blank lines or sliding token window
-    # evidence: list[str] = gold_answer['evidence']
+        r_no_err = []
+        for r in results:
+            if not isinstance(r, dict):
+                errors.append({"filename": f.name, "error": f"non-dict result entry: {type(r)}"})
+                continue
+            if "error" in r:
+                errors.append(r)
+            else:
+                r_no_err.append(r)
 
-    # ## embed context segments and evidence paragraphs
-    # resp = await litellm.aembedding(model=EMBED_MODEL, input=ctx_segments)
-    # ctx_segment_embeddings = resp['data']
-
-    # resp = await litellm.aembedding(model=EMBED_MODEL, input=evidence)
-    # evidence_embeddings = resp['data']
-
-    # ## max similarity per evidence paragraph
-    # sim_ej = ...
-    # n_hits:int = ...
-    # ###hit if sim_ej >= tau
-
-    # ## metrics calculated:
-    # evidence_recall_sem = n_hits / len(evidence)
-    # evidence_sim_mean = mean(sim_ej)
-    # evidence_sim_min = min(sim_ej)
+        score, count = score_count(r_no_err)
+        r_conciseness = conciseness(r_no_err)
+        mean, median = mean_median_query_time(r_no_err)
 
 
+        # avoid division by zero
+        pct = (score / count * 100.0) if count else 0.0
+        concise = r_conciseness if (r_conciseness and r_conciseness > 0) else 0.0
+        efficiency = (pct / concise) if concise else 0.0
 
-    # # Generate Predicted Answer
-    # pred_answer = await dspy_generate_answer.acall(query=query, context=context)
+        # new metrics
+        mean_f1, mean_rs, mean_ge, median_f1, iqr_f1 = eval_metrics(r_no_err)
 
-    # ## type-specific answer scoring
-    # gold_ans_type = gold_answer['answer_type']
-    # if gold_ans_type == "unanswerable":
-    #     ...
-    # elif gold_ans_type == "yes_no":
-    #     ...
-    # elif gold_ans_type == "free_form":
-    #     ...
+        table.add_row([
+            name,
+            f"{pct:.2f}% ({score}/{count})" if count else "n/a (0/0)",
+            f"{concise:.2f}" if concise else "n/a",
+            f"{efficiency:.8f}" if efficiency else "n/a",
+            f"{mean:.2f}s" if mean is not None else "n/a",
+            f"{median:.2f}s" if median is not None else "n/a",
+            f"{mean_f1}",
+            f"{mean_rs}",
+            f"{mean_ge}",
+            f"{median_f1}",
+            f"{iqr_f1}"
+        ])
+
+    print(table)
+    print("\nERRORS:")
+    print(errors)

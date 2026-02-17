@@ -3,25 +3,34 @@ nova_pro: &nova_pro "bedrock/us.amazon.nova-pro-v1:0"
 titan_v2: &titan_v2 "bedrock/amazon.titan-embed-text-v2:0"
 sat_3l_sm: &sat_3l_sm "sat-3l-sm"
 gpt2: &gpt2 "gpt2"
-
+opus_4_5: &opus_4_5 "bedrock/us.anthropic.claude-opus-4-5-20251101-v1:0"
 
 dataset: "OURS_TEST"
-
 
 # llm models
 models:
   tokenizer: *gpt2
   segmenter: *sat_3l_sm
   embed: *titan_v2
-  trip_extract: *nova_pro
-  eval_judge: *nova_pro
-  description_gen: *nova_pro
+  trip_extract: *opus_4_5
+  eval_judge: *opus_4_5
+  description_gen: *opus_4_5
+  trim_model: *opus_4_5
+  hgr: *opus_4_5
+  # trip_extract: *nova_pro
+  # eval_judge: *nova_pro
+  # description_gen: *nova_pro
 
 # maximum concurrent llm calls
-llm_concurrency: 
+llm_concurrency:
   embed: 10
   trip_extract: 8
   description_gen: 16
+
+# llm call retry mechanism
+llm_retry:
+  initial_delay: 1
+  max_attempts: 5
 
 preprocess:
   # segmentation
@@ -38,6 +47,6 @@ leanrag:
   # build
   entity_batch_size: 32
   cluster_size: 20
-  
+
   # retrieve
   max_top_chunks: 5
