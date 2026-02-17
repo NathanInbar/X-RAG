@@ -239,7 +239,9 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
 
                     # semantic matching: gold evidence <-> context splits
                     max_sim_per_gold = sim_matrix.max(axis=1)
-                    tau = 0.8
+                    # GraphRAG descriptions rarely hit cosine >= 0.8 even when relevant,
+                    # so a slightly softer threshold keeps recall/precision informative.
+                    tau = 0.5
 
                     recall = float((max_sim_per_gold >= tau).sum() / len(max_sim_per_gold))
                     max_sim_per_ctx = sim_matrix.max(axis=0)

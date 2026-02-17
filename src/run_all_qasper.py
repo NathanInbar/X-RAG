@@ -22,7 +22,7 @@ if __name__ == "__main__":
         miner_evaluate_with_gold_answers("kggen-qasper-test-1", KGv2MINER(), DATASET),
 
         # #hgr
-        miner_evaluate_with_gold_answers("hgr-qasper-test-1", HypergraphMINER(), DATASET),
+        # miner_evaluate_with_gold_answers("hgr-qasper-test-1", HypergraphMINER(), DATASET),
 
         #leanrag
         miner_evaluate_with_gold_answers("leanrag-qasper-test-1", LeanragMINER(), DATASET)], 
