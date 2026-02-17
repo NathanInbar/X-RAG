@@ -108,6 +108,8 @@ class SimplifiedAnswer(BaseModel):
     text: str | None
     evidence: list[str]
     highlighted_evidence: list[str]
+    nlp_background: NLPBackground | None
+    topic_background: TopicBackground | None
 
 
 class QasperMineLike(BaseModel):
@@ -116,16 +118,22 @@ class QasperMineLike(BaseModel):
     answers:list[SimplifiedAnswer]
 
 
-def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
+def answer_container_to_simple(
+    container: AnswerContainer,
+    nlp_background: NLPBackground | None,
+    topic_background: TopicBackground | None,
+) -> SimplifiedAnswer:
     """Convert all annotations for a question into a single simplified answer."""
 
-    for answer in container.answer:
+    for i, answer in enumerate(container.answer):
         if answer.unanswerable:
             return SimplifiedAnswer(
                 answer_type=AnswerType.UNANSWERABLE,
                 text=None,
                 evidence=answer.evidence,
                 highlighted_evidence=answer.highlighted_evidence,
+                nlp_background=nlp_background,
+                topic_background=topic_background,
             )
         if answer.free_form_answer:
             return SimplifiedAnswer(
@@ -133,6 +141,8 @@ def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
                 text=answer.free_form_answer,
                 evidence=answer.evidence,
                 highlighted_evidence=answer.highlighted_evidence,
+                nlp_background=nlp_background,
+                topic_background=topic_background,
             )
         if answer.extractive_spans:
             return SimplifiedAnswer(
@@ -140,6 +150,8 @@ def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
                 text="\n".join(answer.extractive_spans),
                 evidence=answer.evidence,
                 highlighted_evidence=answer.highlighted_evidence,
+                nlp_background=nlp_background,
+                topic_background=topic_background,
             )
         if answer.yes_no is not None:
             normalized = "yes" if answer.yes_no else "no"
@@ -148,12 +160,16 @@ def answer_container_to_simple(container: AnswerContainer) -> SimplifiedAnswer:
                 text=normalized,
                 evidence=answer.evidence,
                 highlighted_evidence=answer.highlighted_evidence,
+                nlp_background=nlp_background,
+                topic_background=topic_background,
             )
     return SimplifiedAnswer(
         answer_type=AnswerType.UNANSWERABLE,
         text=None,
         evidence=[],
         highlighted_evidence=[],
+        nlp_background=nlp_background,
+        topic_background=topic_background,
     )
 
 def flatten_article_content(full_text:FullText) -> str:
@@ -177,8 +193,24 @@ def qasper_row_to_mine(row:QasperRow) -> QasperMineLike:
     essay_content = flatten_article_content(row.full_text)
     
     # NOTE: possible to filter questions by background experience , paper read, etc
-    queries:list[str] = row.qas.question 
-    answers:list[SimplifiedAnswer] = [answer_container_to_simple(x) for x in row.qas.answers]
+    queries:list[str] = row.qas.question
+    answers:list[SimplifiedAnswer] = []
+    for i, container in enumerate(row.qas.answers):
+        nlp_background = (
+            row.qas.nlp_background[i]
+            if row.qas.nlp_background and i < len(row.qas.nlp_background)
+            else None
+        )
+        topic_background = (
+            row.qas.topic_background[i]
+            if row.qas.topic_background and i < len(row.qas.topic_background)
+            else None
+        )
+        answers.append(
+            answer_container_to_simple(
+                container, nlp_background=nlp_background, topic_background=topic_background
+            )
+        )
 
     if len(queries) != len(answers):
         raise RuntimeError(f"Number of queries != number of answers for row: {row.id}")
