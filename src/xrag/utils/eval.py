@@ -13,7 +13,7 @@ EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
 
 
 class MINER(object):
-    async def ingest(self, preprocess_results_filename: str):
+    async def ingest(self, preprocess_results_filename: str|None = None):
         """ Ingest knowledge from some text. """
         pass
     async def pre_retrieve(self):
