@@ -10,12 +10,7 @@ from xrag.utils import mg_driver
 from xrag.config import config
 from xrag.dataset_processing.preprocess import process_dataset_file, TextSegmenter
 
-VERBOSE = 0
-JUST_ONE = 1
-
 JUDGE_MODEL = dspy.LM(config.models["eval_judge"])
-_TRIM_MODEL = dspy.LM(config.models["trim_model"])
-
 
 class MINER(object):
     async def ingest(self, preprocess_results_filename: str):
@@ -55,8 +50,6 @@ def conciseness(result):
     - Ask LLM to trim to optimal context.
     - Compute len(optimal)/len(actual)
     """
-    # optimal_length = 0
-    actual_length = 0
     count = 0
     for doc in result:
         for query in doc["queries"]:
@@ -218,12 +211,8 @@ def show_results():
     table.field_names = [
         "Name",
         "Score",
-        # "Score of Optimal",
         "Avg. Context Length",
-        # "Avg. Optimal Length",
-        # "% Necessary Context",
-        # "Overall",
-        # "Conciseness",
+        # "Score / Avg. Context Length",
         "Query Duration (mean)",
         "Query Duration (median)",
     ]
@@ -264,7 +253,6 @@ def show_results():
                 errors.append(r)
             else:
                 r_no_err.append(r)
-            if JUST_ONE: break
 
         score, count = score_count(r_no_err)
         avg_len_act = conciseness(r_no_err)
