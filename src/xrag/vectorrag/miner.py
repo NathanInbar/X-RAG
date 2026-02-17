@@ -3,6 +3,8 @@ import numpy as np
 from xrag.utils.eval import MINER
 from xrag.config import config
 from xrag.dataset_processing.preprocess import embed_call_with_retry
+from pathlib import Path
+import ijson
 
 class BasicVectorMINER(MINER):
 	""" A MINER implementation for a very simple vector RAG system. """
@@ -21,20 +23,26 @@ class BasicVectorMINER(MINER):
 		self.quantile = quantile 
 		self.embedding_model = config.models["embed"]
 
-	async def ingest(self, text: str):
-		new_chunks = [text[i*self.chunk_size:(i+1)*self.chunk_size+self.overlap] for i in range(0, len(text)//self.chunk_size)]
-		new_embeddings = embed_call_with_retry(new_chunks)
-		new_embeddings = [np.array(e.embedding) for e in new_embeddings.data]
+	async def ingest(self, preprocess_chunk_json:Path, _:Path):
+		
+		with open(preprocess_chunk_json, "rb") as in_file:
+			for itm in ijson.items(in_file, "item"):
+				for i,chunk in enumerate(itm['chunks']):
+					text = chunk["raw_text"]
 
-		self.chunks += new_chunks
-		self.embeddings += new_embeddings
+					new_chunks = [text[i*self.chunk_size:(i+1)*self.chunk_size+self.overlap] for i in range(0, len(text)//self.chunk_size)]
+					new_embeddings = await embed_call_with_retry(new_chunks)
+					new_embeddings = [np.array(e.embedding) for e in new_embeddings.data]
+
+					self.chunks += new_chunks
+					self.embeddings += new_embeddings
 	
-	async def pre_retrieve(self):
+	async def pre_retrieve(self, article_name):
 		pass
 
-	async def retrieve(self, text: str) -> str:
+	async def retrieve(self, query_text, preprocess_chunks_filepath:Path) -> str:
 		# Make embedding 
-		text_embedding = (await litellm.aembedding(self.embedding_model, input=[text]))
+		text_embedding = (await litellm.aembedding(self.embedding_model, input=[query_text]))
 		text_embedding = np.array(text_embedding.data[0].embedding)
 
 		# Find similarities 
