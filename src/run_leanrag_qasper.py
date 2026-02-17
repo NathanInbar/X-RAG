@@ -1,7 +1,7 @@
 import asyncio
 from xrag.leanrag.miner import LeanragMINER
-from xrag.utils.eval import evaluate
-from xrag.utils.eval_gold import miner_evaluate_with_gold_answers
+# from xrag.utils.eval import evaluate
+from xrag.utils.eval_gold import evaluate, miner_evaluate_with_gold_answers
 
 DATASET = "QASPER_TEST" # only dataset currently supporting gold context + answers
 

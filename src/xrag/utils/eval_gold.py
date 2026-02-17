@@ -17,6 +17,8 @@ import numpy as np
 EMBED_MODEL = config.models["embed"]
 EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
 
+SIM_TAU = 0.65
+
 def score_count(result):
     """ Computes total score and count. """
     score = 0
@@ -198,7 +200,9 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
                     # skip where answer is unanswerable or yes/no
                     if gold_answer["answer_type"] not in ["free_form", "extractive_spans"]: continue
                     # skip where author has low nlp background experience:
-                    if gold_answer["nlp_background"] == "zero": continue
+                    nlp_background = gold_answer.get("nlp_background")
+                    if nlp_background == "zero":
+                        continue
 
                     # graphrag retrieval
                     print(f"\rQuery {j+1}/{len(queries)}", end="")
