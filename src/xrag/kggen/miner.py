@@ -2,6 +2,8 @@ from xrag.utils.eval import MINER
 from xrag.config import config
 from xrag.kggen.tools import extract, make_graph, resolve, query
 import dspy
+import ijson
+from pathlib import Path
 
 class KGv2MINER(MINER):
 	kb: list[tuple[str, str, str]] = []
@@ -12,21 +14,27 @@ class KGv2MINER(MINER):
 		self.model = config.models["description_gen"]
 		self.embedding_model = config.models["embed"]
 	
-	async def ingest(self, text: str):
+	async def ingest(self, preprocess_chunk_json:Path, _:Path):
 		with dspy.context(lm=dspy.LM(self.model)):
-			e, k = await extract(text)
-		self.kb += k
-		self.eb += e
+			with open(preprocess_chunk_json, "rb") as in_file:
+				for itm in ijson.items(in_file, "item"):
+					for i,chunk in enumerate(itm['chunks']):
+						text = chunk["raw_text"]
+
+						e, k = await extract(text)
+
+						self.kb += k
+						self.eb += e
 	
-	async def pre_retrieve(self):
+	async def pre_retrieve(self, article_name):
 		with dspy.context(lm=dspy.LM(self.model)):
 			self.eb, self.kb = await resolve(self.eb, self.kb)
 			self.kg = await make_graph(self.eb, self.kb, self.embedding_model)
 
-	async def retrieve(self, text: str) -> str:
+	async def retrieve(self, query_text, preprocess_chunks_filepath:Path) -> str:
 		assert not (self.kg is None)
 		with dspy.context(lm=dspy.LM(self.model)):
-			k = await query(text, self.kg, self.embedding_model)
+			k = await query(query_text, self.kg, self.embedding_model)
 		return "\n".join([" ".join(t) for t in k])
 
 	async def reset(self):

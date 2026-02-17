@@ -22,8 +22,8 @@ class LeanragMINER(MINER):
         if last_layer == 0:
             self.small_articles.add(article_name)
     
-    async def retrieve(self, text, preprocess_chunks_filepath:Path):
-        return "\n".join(await get_response_context_data(text, preprocess_chunks_filepath))
+    async def retrieve(self, query_text, preprocess_chunks_filepath:Path):
+        return "\n".join(await get_response_context_data(query_text, preprocess_chunks_filepath))
     
     async def reset(self):
         await mg_driver.clear()

@@ -2,6 +2,8 @@ from xrag.hgr.tools import aggregate, extract_edges_entities, query
 import dspy
 from xrag.utils.eval import MINER
 from xrag.config import config
+from pathlib import Path
+import ijson
 
 MODEL = config.models["hgr"]
 
@@ -27,20 +29,24 @@ class HypergraphMINER(MINER):
 		self.model = model
 		self.embedding_model = config.models["embed"]
 	
-	async def ingest(self, text: str):
+	async def ingest(self, preprocess_chunk_json:Path, _:Path):
 		with dspy.context(lm=dspy.LM(self.model)):
-			k, e = await extract_edges_entities(text)
-		self.kb += k
-		self.eb += e
+			with open(preprocess_chunk_json, "rb") as in_file:
+				for itm in ijson.items(in_file, "item"):
+					for i,chunk in enumerate(itm['chunks']):
+						text = chunk["raw_text"]
+						k, e = await extract_edges_entities(text)
+						self.kb += k
+						self.eb += e
 	
-	async def pre_retrieve(self):
+	async def pre_retrieve(self, article_name):
 		with dspy.context(lm=dspy.LM(self.model)):
 			self.hg = await aggregate(self.kb, self.eb, self.embedding_model)
 
-	async def retrieve(self, text: str) -> str:
+	async def retrieve(self, query_text, preprocess_chunks_filepath:Path) -> str:
 		assert not (self.hg is None)
 		with dspy.context(lm=dspy.LM(self.model)):
-			k = await query(text, self.hg, self.embedding_model, kv=self.kv, tv=self.tv, kh=self.kh, th=self.th)
+			k = await query(query_text, self.hg, self.embedding_model, kv=self.kv, tv=self.tv, kh=self.kh, th=self.th)
 		return k
 
 	async def reset(self):
