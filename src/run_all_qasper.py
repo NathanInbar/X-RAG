@@ -22,11 +22,7 @@ if __name__ == "__main__":
         miner_evaluate_with_gold_answers("kggen-qasper", KGv2MINER(), DATASET),
 
         # #hgr
-        # BUG:
-        # ERROR: axis 1 is out of bounds for array of dimension 1
-        # look in hgr tools at the np linalg calls
-        
-        # miner_evaluate_with_gold_answers("hgr-qasper-test-1", HypergraphMINER(), DATASET),
+        miner_evaluate_with_gold_answers("hgr-qasper-test-1", HypergraphMINER(), DATASET),
 
         #leanrag
         miner_evaluate_with_gold_answers("leanrag-qasper", LeanragMINER(), DATASET)], 
