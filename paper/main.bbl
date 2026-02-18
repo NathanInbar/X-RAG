@@ -16,33 +16,5 @@
   {}
 \endgroup
 
-\datalist[entry]{none/global//global/global}
-  \entry{abramowitz1948handbook}{book}{}
-    \name{author}{2}{}{%
-      {{hash=AM}{%
-         family={Abramowitz},
-         familyi={A\bibinitperiod},
-         given={Milton},
-         giveni={M\bibinitperiod},
-      }}%
-      {{hash=SIA}{%
-         family={Stegun},
-         familyi={S\bibinitperiod},
-         given={Irene\bibnamedelima A},
-         giveni={I\bibinitperiod\bibinitdelim A\bibinitperiod},
-      }}%
-    }
-    \list{publisher}{1}{%
-      {US Government printing office}%
-    }
-    \strng{namehash}{AMSIA1}
-    \strng{fullhash}{AMSIA1}
-    \field{labelnamesource}{author}
-    \field{labeltitlesource}{title}
-    \field{title}{Handbook of mathematical functions with formulas, graphs, and
-  mathematical tables}
-    \field{volume}{55}
-    \field{year}{1948}
-  \endentry
-\enddatalist
+\datalist[entry]{none/global//global/global}\enddatalist
 \endinput

@@ -1,20 +1,23 @@
 \section{Introduction}
-Blah blah blah .. introduction
 
-\textbf{Contributions.}
-\begin{itemize}
-      \item item1
-\end{itemize}
+Retrieval-Augmented Generation (RAG) has emerged as a foundational technique for grounding large language models in external knowledge (...)
+Standard RAG approaches (describe: retrieval of fixed-length text chunks via vector similarity. state limitations)
 
-\textbf{Paper outline (drafting)}
+Graph-based RAG methods were introduced to (address limitations).
 
-- talk about how graph rag methods construct and then retrieve knowledge. then that 
-becomes the context that goes into the LLM for answering the query.
+GraphRAG methods have evolved rapidly, with contemporary methods ... (introduce modern methods with their unique contributions)
+This shift fundamentally changes what it means to "retrieve context". In modern GraphRAG systems, retrieved context may consist of hierarchical summaries, merged relation descriptions, hypergraph constructions, and subgraph projections rather than
+contiguous spans of source text.
 
-\textbf{Evaluation Metrics}
+As these methods have grown more capable, evaluation frameworks (.. are getting left behind- measuring accuracy only is not effective). A system that returns the entire source corpus as context will answer nearly every evaluation question correctly, 
+but ... 
 
-- context sufficiency score: For each method, we compute the percentage of answers for which the
-LLM judge found that the retrieved context sufficiently included the information. A higher
-sufficiency percentage means the method usually finds the necessary information.
+\dots
 
-- average context length: 
+In this paper, we conduct a systematic comparison of three advanced GraphRAG systems from recent literature: KGGen, HyperGraphRAG, and LeanRAG. We compare these methods alongside two baseline techniques- a standard vector-based RAG system and a
+method we call "Parrot", which returns the full source text for every query.
+
+Our investigation of standard evaluation methods show that existing benchmarks are insufficiently challenging on the widely-used MINE dataset ...
+
+... To address the inadequacy of accuracy as a sole metric, we introduce concisness ... 
+
