@@ -209,6 +209,21 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
                     q_st = time.time()
                     context:str = await miner.retrieve(query, preprocessed_chunks)
                     q_en = time.time()
+
+                    # If no context is returned, the subsequent calculations will fail
+                    if context.strip() == "":
+                        query_results.append({
+                            "query": query,
+                            "context": context,
+                            "duration": q_en - q_st,
+                            "evidence_recall": -0.0,
+                            "evidence_precision": -0.0,
+                            "evidence_f1": -0.0,
+                            "mean_gold_sim": -0.0,
+                            "min_gold_sim": -0.0,
+                            "is_constructible": False,
+                        })
+                        continue
                 
                     ### INSERT QUERY EVALUATION ALGORITHM HERE:
                     ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
