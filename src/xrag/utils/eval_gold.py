@@ -1,3 +1,4 @@
+import asyncio
 from xrag.paths import DATASETS_DIR, RESULTS_DIR, CACHE_DIR
 import json
 import time
@@ -319,7 +320,11 @@ async def evaluate(
             return await f
 
     print(f"Running {len(eval_itms)} evaluations with concurrency {concurrency}")
-    [await f for f in eval_itms]
+    if concurrency > 1:
+        jobs = [limited(j) for j in eval_itms]
+        await asyncio.gather(*jobs)
+    else:
+        [await f for f in eval_itms]
     print("Done!")
 
     show_results()
