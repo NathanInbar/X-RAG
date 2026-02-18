@@ -116,7 +116,7 @@ async def query(
 	e_edges = np.array([hg.nodes[i]["embedding"] for i in i_edges])
 
 	# Get entities from prompt 
-	q_entities = await extract_entities(query)
+	# q_entities = await extract_entities(query)
 	# Make embedding
 	# Using json as input seems questionable but it's what the paper describes so ehh
 	# q_em_input = json.dumps(q_entities)
