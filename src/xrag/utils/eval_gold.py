@@ -120,6 +120,194 @@ class _EvalSignature(dspy.Signature):
 ###
 pred_answer_eval = dspy.Predict(_EvalSignature)
 
+
+async def miner_evaluate_gold_bulk(name:str, miner: "MINER", dataset: str):
+    dataset_dir = DATASETS_DIR / dataset
+    paths = list(dataset_dir.iterdir())
+    result_file = RESULTS_DIR / f"{name}.json"
+    tmp_file = result_file.with_suffix(result_file.suffix + ".tmp")
+
+    print(f"Writing results file to '{result_file}'")
+
+    # ---- load existing results (cache) ----
+    results_obj = {"name": name, "result": []}
+    if result_file.is_file():
+        try:
+            with open(result_file, "r") as fp:
+                loaded = json.load(fp)
+            # accept either full object {"name":..., "result":[...]} or a bare list (older attempts)
+            if isinstance(loaded, dict) and isinstance(loaded.get("result"), list):
+                results_obj = loaded
+                results_obj["name"] = name  # keep current run name
+            elif isinstance(loaded, list):
+                results_obj["result"] = loaded
+        except Exception:
+            pass
+
+    # consider a file "done" if we already have an entry for it that is not an error
+    done_files = {
+        r.get("filename")
+        for r in results_obj["result"]
+        if isinstance(r, dict) and r.get("filename") and ("error" not in r)
+    }
+
+    def _atomic_save():
+        # atomic-ish save (write tmp then replace)
+        with open(tmp_file, "w") as fp:
+            json.dump(results_obj, fp, indent=2, ensure_ascii=False)
+            fp.write("\n")
+        tmp_file.replace(result_file)
+
+    _atomic_save()
+
+    ingested_paths = []
+    # ---- ingest loop ----
+    for i, p in enumerate(paths):
+
+        # caching skip
+        if p.name in done_files:
+            print(f"SKIP (cached): {p.name} ({i+1}/{len(paths)})")
+            continue
+
+        try:
+            print(f"START INGEST: {p.name} ({i+1}/{len(paths)})")
+
+            # Load data
+            with open(p, "r") as fp:
+                mine_data = json.load(fp)
+
+            # Preprocess (only if missing)
+            preprocessed_chunks = CACHE_DIR / f"{p.stem}__chunks.json"
+            preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
+            if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
+                await process_dataset_file(p)
+
+            # Ingest
+            await miner.ingest(preprocessed_chunks, preprocessed_descs)
+            await miner.pre_retrieve(p.name)
+            ingested_paths.append(p)
+
+        except Exception as e:
+            tb = e.__traceback__
+            last = traceback.extract_tb(tb)
+            result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
+            print(f"ERROR: {str(e)}")
+
+    # ---- evaluation loop ----
+    for i, p in enumerate(ingested_paths):
+
+        try:
+            print(f"START EVAL: {p.name} ({i+1}/{len(paths)})")
+
+            # Load data
+            with open(p, "r") as fp:
+                mine_data = json.load(fp)
+
+
+            # Query + evaluate
+            print("Evaluating...")
+            query_results = []
+
+            queries = mine_data.get("queries", [])
+            gold_answers = mine_data.get("answers", [])
+
+            with dspy.context(lm=EVAL_JUDGE_LM):
+                for j, (query, gold_answer) in enumerate(zip(queries, gold_answers)):
+
+                    # skip where answer is unanswerable or yes/no
+                    if gold_answer["answer_type"] not in ["free_form", "extractive_spans"]: continue
+                    # skip where author has low nlp background experience:
+                    nlp_background = gold_answer.get("nlp_background")
+                    if nlp_background == "zero":
+                        continue
+
+                    # graphrag retrieval
+                    print(f"\rQuery {j+1}/{len(queries)}", end="")
+                    q_st = time.time()
+                    context:str = await miner.retrieve(query, preprocessed_chunks)
+                    q_en = time.time()
+                
+                    ### INSERT QUERY EVALUATION ALGORITHM HERE:
+                    ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
+                    ### (NOTE:) TO EMBED: CALL resp = await litellm.aembedding(model=EMBED_MODEL, input = my_string or for batch [str1,str2,...]) THEN USE resp['data]
+
+                    # 1. Evidence F1, R-S, G-E
+                    gold_evidence:list[str] = gold_answer["evidence"]
+                    if gold_evidence is None:
+                        print("WARNING: found answer with no evidence. skipping")
+                        continue
+                
+                    resp = await litellm.aembedding(model=EMBED_MODEL, input=gold_evidence)
+                    G = np.array([row["embedding"] for row in resp["data"]], dtype=np.float32)
+
+                    context_split:list[str] = context.splitlines()
+                    ctx_vecs = []
+                    for batch in batched(context_split, 25):
+                        resp = await litellm.aembedding(model=EMBED_MODEL, input=batch)
+                        ctx_vecs.extend([row["embedding"] for row in resp["data"]])
+                    C = np.array(ctx_vecs, dtype=np.float32)
+
+                    eps= 1e-12
+                    # normalize & compute similarity matrix
+                    G_norm = (G / np.linalg.norm(G, axis=1, keepdims=True) + eps)
+                    C_norm = (C / np.linalg.norm(C, axis=1, keepdims=True) + eps)
+
+                    sim_matrix = G_norm @ C_norm.T
+
+                    # semantic matching: gold evidence <-> context splits
+                    max_sim_per_gold = sim_matrix.max(axis=1)
+                    # GraphRAG descriptions rarely hit cosine >= 0.8 even when relevant,
+                    # so a slightly softer threshold keeps recall/precision informative.
+                    tau = 0.5
+
+                    recall = float((max_sim_per_gold >= tau).sum() / len(max_sim_per_gold))
+                    max_sim_per_ctx = sim_matrix.max(axis=0)
+                    precision = float((max_sim_per_ctx >= tau).sum() / len(max_sim_per_ctx))
+                    f1 = 0.0 if (precision + recall) == 0 else float(2 * precision * recall / (precision + recall))
+
+
+                    # 2. can the answer be constructed from the context?: yes/no
+                    is_constructible = (await pred_answer_eval.acall(
+                        query=query, gold_answer=gold_answer["text"], retrieved_context=context)).is_constructible
+
+                    query_results.append(
+                        {
+                            "query": query,
+                            "context": context,
+                            "duration": q_en - q_st,
+                            "evidence_recall": recall,
+                            "evidence_precision": precision,
+                            "evidence_f1": f1,
+                            "mean_gold_sim": float(max_sim_per_gold.mean()),
+                            "min_gold_sim": float(max_sim_per_gold.min()),
+                            "is_constructible": is_constructible
+                        }
+                    )
+                print("")
+
+            result = {
+                "filename": p.name,
+                "queries": queries,
+            }
+
+        except Exception as e:
+            tb = e.__traceback__
+            last = traceback.extract_tb(tb)
+            result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
+            raise e 
+            print(f"ERROR: {str(e)}")
+            try:
+                await miner.reset()
+            except Exception:
+                pass
+
+        # persist + update cache
+        results_obj["result"].append(result)
+        if "error" not in result:
+            done_files.add(p.name)
+        _atomic_save()
+        print(f"wrote result to {result_file}")    
+
 async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: str):
     dataset_dir = DATASETS_DIR / dataset
     paths = list(dataset_dir.iterdir())

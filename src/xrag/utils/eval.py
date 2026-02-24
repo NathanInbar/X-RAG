@@ -70,6 +70,132 @@ def mean_median_query_time(result):
     median = times[len(times)//2]
     return mean, median
 
+async def miner_evaluate_bulk(name:str, miner: "MINER", dataset: str):
+    dataset_dir = DATASETS_DIR / dataset
+    paths = list(dataset_dir.iterdir())
+    result_file = RESULTS_DIR / f"{name}.json"
+    tmp_file = result_file.with_suffix(result_file.suffix + ".tmp")
+
+    print(f"Writing results file to '{result_file}'")
+
+    # ---- load existing results (cache) ----
+    results_obj = {"name": name, "result": []}
+    if result_file.is_file():
+        try:
+            with open(result_file, "r") as fp:
+                loaded = json.load(fp)
+            # accept either full object {"name":..., "result":[...]} or a bare list (older attempts)
+            if isinstance(loaded, dict) and isinstance(loaded.get("result"), list):
+                results_obj = loaded
+                results_obj["name"] = name  # keep current run name
+            elif isinstance(loaded, list):
+                results_obj["result"] = loaded
+        except Exception:
+            pass
+
+    # consider a file "done" if we already have an entry for it that is not an error
+    done_files = {
+        r.get("filename")
+        for r in results_obj["result"]
+        if isinstance(r, dict) and r.get("filename") and ("error" not in r)
+    }
+
+    def _atomic_save():
+        # atomic-ish save (write tmp then replace)
+        with open(tmp_file, "w") as fp:
+            json.dump(results_obj, fp, indent=2, ensure_ascii=False)
+            fp.write("\n")
+        tmp_file.replace(result_file)
+
+    _atomic_save()
+
+    ingested_paths = []
+    # ---- ingest loop ----
+    for i, p in enumerate(paths):
+
+        # caching skip
+        if p.name in done_files:
+            print(f"SKIP (cached): {p.name} ({i+1}/{len(paths)})")
+            continue
+
+        try:
+            print(f"START INGEST: {p.name} ({i+1}/{len(paths)})")
+
+            # Load data
+            with open(p, "r") as fp:
+                mine_data = json.load(fp)
+
+            # Preprocess (only if missing)
+            preprocessed_chunks = CACHE_DIR / f"{p.stem}__chunks.json"
+            preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
+            if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
+                await process_dataset_file(p)
+
+            # Ingest
+            await miner.ingest(preprocessed_chunks, preprocessed_descs)
+            await miner.pre_retrieve(p.name)
+            ingested_paths.append(p)
+
+        except Exception as e:
+            tb = e.__traceback__
+            last = traceback.extract_tb(tb)
+            result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
+            print(f"ERROR: {str(e)}")
+
+    # ---- evaluation loop ----
+    for i, p in enumerate(ingested_paths):
+
+        try:
+            print(f"START EVAL: {p.name} ({i+1}/{len(paths)})")
+
+            # Load data
+            with open(p, "r") as fp:
+                mine_data = json.load(fp)
+
+            # Query + evaluate
+            print("Evaluating...")
+            queries = []
+            with dspy.context(lm=EVAL_JUDGE_LM):
+                answers = mine_data.get("answers", [])
+                for j, a in enumerate(answers):
+                    print(f"\rQuery {j+1}/{len(answers)}", end="")
+                    q_st = time.time()
+                    info = await miner.retrieve(a, preprocessed_chunks)
+                    q_en = time.time()
+                    contained = (await eval.acall(context=info, statement=a)).context_contains_statement
+                    queries.append(
+                        {
+                            "query": a,
+                            "context": info,
+                            "contained": contained,
+                            "duration": q_en - q_st,
+                        }
+                    )
+                print("")
+
+            result = {
+                "filename": p.name,
+                "queries": queries,
+            }
+
+        except Exception as e:
+            tb = e.__traceback__
+            last = traceback.extract_tb(tb)
+            result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
+            raise e 
+            print(f"ERROR: {str(e)}")
+            try:
+                await miner.reset()
+            except Exception:
+                pass
+
+        # persist + update cache
+        results_obj["result"].append(result)
+        if "error" not in result:
+            done_files.add(p.name)
+        _atomic_save()
+        print(f"wrote result to {result_file}")    
+
 async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", dataset: str):
     dataset_dir = DATASETS_DIR / dataset
     paths = list(dataset_dir.iterdir())
