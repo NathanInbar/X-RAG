@@ -180,7 +180,6 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
             preprocessed_descs = CACHE_DIR / f"{p.stem}__g0_descriptions.json"
             if (not preprocessed_chunks.is_file()) or (not preprocessed_descs.is_file()):
                 await process_dataset_file(p)
-
             # Ingest
             print("Ingesting...")
             ingest_st = time.time()

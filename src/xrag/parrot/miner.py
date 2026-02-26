@@ -8,11 +8,10 @@ class ParrotMINER(MINER):
 	def __init__(self):
 		pass
 
-	async def ingest(self, preprocess_chunk_json:Path, _:Path):
-
-		with open(preprocess_chunk_json, "rb") as in_file:
-			for itm in ijson.items(in_file, "item"):
-				for i,chunk in enumerate(itm['chunks']):
+	async def ingest(self, chunks: Path, descriptions: Path):
+		with open(chunks, "rb") as in_file:
+			for item in ijson.items(in_file, "item"):
+				for chunk in item["chunks"]:
 					self.kb += chunk["raw_text"] + "\n"
 
 		print(f"Parrot ingested {len(self.kb)} characters.")

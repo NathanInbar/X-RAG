@@ -1,3 +1,4 @@
+from pathlib import Path
 from xrag.paths import DATASETS_DIR, RESULTS_DIR, CACHE_DIR
 import json
 import time
@@ -13,7 +14,7 @@ EVAL_JUDGE_LM = dspy.LM(config.models["eval_judge"])
 
 
 class MINER(object):
-    async def ingest(self, preprocess_results_filename: str|None = None):
+    async def ingest(self, chunks: Path, descriptions: Path):
         """ Ingest knowledge from some text. """
         pass
     async def pre_retrieve(self):

@@ -11,9 +11,9 @@ class LeanragMINER(MINER):
         # i.e had to fall back since recursion stopped at layer 0
         self.small_articles = set()
 
-    async def ingest(self, preprocess_chunks_filepath:Path, preprocess_descriptions_filepath:Path):
+    async def ingest(self, chunks: Path, descriptions: Path):
         # create base KG
-        await upsert_from_preprocessed(preprocess_chunks_filepath, preprocess_descriptions_filepath)
+        await upsert_from_preprocessed(chunks, descriptions)
         self.small_articles.clear()
 
     async def pre_retrieve(self, article_name):

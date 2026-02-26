@@ -23,9 +23,8 @@ class BasicVectorMINER(MINER):
 		self.quantile = quantile 
 		self.embedding_model = config.models["embed"]
 
-	async def ingest(self, preprocess_chunk_json:Path, _:Path):
-		
-		with open(preprocess_chunk_json, "rb") as in_file:
+	async def ingest(self, chunks: Path, descriptions: Path):
+		with open(chunks, "rb") as in_file:
 			for itm in ijson.items(in_file, "item"):
 				for i,chunk in enumerate(itm['chunks']):
 					text = chunk["raw_text"]

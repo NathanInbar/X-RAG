@@ -29,11 +29,11 @@ class HypergraphMINER(MINER):
 		self.model = model
 		self.embedding_model = config.models["embed"]
 	
-	async def ingest(self, preprocess_chunk_json:Path, _:Path):
+	async def ingest(self, chunks: Path, descriptions: Path):
 		with dspy.context(lm=dspy.LM(self.model)):
-			with open(preprocess_chunk_json, "rb") as in_file:
-				for itm in ijson.items(in_file, "item"):
-					for i,chunk in enumerate(itm['chunks']):
+			with open(chunks, "rb") as in_file:
+				for item in ijson.items(in_file, "item"):
+					for chunk in item["chunks"]:
 						text = chunk["raw_text"]
 						k, e = await extract_edges_entities(text)
 						self.kb += k
