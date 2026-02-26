@@ -33,7 +33,7 @@ class BasicVectorMINER(MINER):
 	async def ingest(self, chunks: Path, descriptions: Path):
 		with open(chunks, "rb") as in_file:
 			for item in ijson.items(in_file, "item"):
-				for chunk in enumerate(item["chunks"]):
+				for chunk in item["chunks"]:
 					self.chunks.append(chunk["raw_text"])
 					self.embeddings.append(np.array(chunk["embedding"]))
 
