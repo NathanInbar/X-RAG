@@ -21,6 +21,11 @@ class MINER(object):
     async def retrieve(self, text: str) -> str:
         """ Find information relevant to a text. """
         pass
+    async def retrieve_parts(self, text: str, chunks_file=None) -> tuple[str, str, str, str]:
+        """ Return (base_entity_info, agg_entity_info, reasoning_path_info, chunks).
+        Default: puts all context in the chunks slot. """
+        ctx = await self.retrieve(text, chunks_file) if chunks_file else await self.retrieve(text)
+        return ("", "", "", ctx)
     async def reset(self):
         """ Forget ingested knowledge. """
         pass

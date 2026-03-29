@@ -24,6 +24,9 @@ class LeanragMINER(MINER):
     
     async def retrieve(self, query_text, preprocess_chunks_filepath:Path):
         return "\n".join(await get_response_context_data(query_text, preprocess_chunks_filepath))
+
+    async def retrieve_parts(self, query_text, preprocess_chunks_filepath:Path):
+        return await get_response_context_data(query_text, preprocess_chunks_filepath)
     
     async def reset(self):
         await mg_driver.clear()
