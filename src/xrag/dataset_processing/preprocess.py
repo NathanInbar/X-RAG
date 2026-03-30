@@ -490,7 +490,7 @@ async def describe_all_chunks(chunks):
         pbar.close()
 
 async def process_dataset_file(file:Path):
-    logger.debug(f"Processing file: '{file.stem}'")
+    logger.info(f"Processing file: '{file.stem}'")
     description_map.map.clear()
     out_results_filename = CACHE_DIR / f"{file.stem}__chunks.json"
     out_descriptions_filename = CACHE_DIR / f"{file.stem}__g0_descriptions.json"
@@ -500,6 +500,7 @@ async def process_dataset_file(file:Path):
         data = json.load(fp)
     essay = data['essay']
 
+    logger.info(f"Segmenting text ({len(essay)} chars) ...")
     TextSegmenter.configure(model=SEGMENTER_MODEL)
     chunk_texts:list[str] = TextSegmenter.create_segments(essay)
     if not chunk_texts:
@@ -527,9 +528,9 @@ async def process_dataset_file(file:Path):
         if(n_tokens > max_tokens):
             max_tokens = n_tokens
 
-    logger.debug(f"Generating chunk embeddings ...")
+    logger.info(f"Generating chunk embeddings for {len(chunks)} chunks ...")
     await generate_chunk_embeddings(chunks)
-    logger.debug(f"Extracting chunk triples ...")
+    logger.info(f"Extracting chunk triples for {len(chunks)} chunks ...")
     await extract_chunk_triples(chunks)
 
     # results.json file
@@ -549,7 +550,9 @@ async def process_dataset_file(file:Path):
         out_file.write("\n]\n}")
         out_file.write("]")
 
+    logger.info(f"Generating descriptions for {len(chunks)} chunks ...")
     await describe_all_chunks(chunks)
+    logger.info("Waiting for pending summaries ...")
     await description_map.wait_for_summaries()
     with open(out_descriptions_filename, "w") as outfile:
         outfile.write("[\n")

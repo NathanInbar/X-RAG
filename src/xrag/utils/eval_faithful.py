@@ -171,7 +171,7 @@ async def miner_evaluate_faithful(name: str, miner: "MINER", dataset: str):
             queries = mine_data.get("queries", [])
 
             for j, query in enumerate(queries):
-                print(f"\rQuery {j+1}/{len(queries)}", end="")
+                print(f"\rQuery {j+1}/{len(queries)}", end="", flush=True)
 
                 # Retrieve
                 q_st = time.time()
