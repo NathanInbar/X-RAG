@@ -119,7 +119,8 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
 
         try:
             print(f"START EVAL: {p.name} ({i+1}/{len(paths)})")
-
+            await miner.reset()
+            
             # Load data
             with open(p, "r") as fp:
                 mine_data = json.load(fp)
@@ -147,7 +148,7 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
                     q_st = time.time()
                     info = await miner.retrieve(a, preprocessed_chunks)
                     q_en = time.time()
-                    contained = (await eval.acall(context=info, statement=a)).context_contains_statement
+                    contained = (await dspy_evaluate.acall(context=info, statement=a)).context_contains_statement
                     queries.append(
                         {
                             "query": a,
@@ -164,13 +165,12 @@ async def miner_evaluate_individual_with_preprocess(name: str, miner: "MINER", d
                 "queries": queries,
             }
 
-            await miner.reset()
 
         except Exception as e:
             tb = e.__traceback__
-            last = traceback.extract_tb(tb)
+            last = traceback.extract_tb(tb)[-1]
             result = {"filename": p.name, "error": f"{last.filename}:{last.lineno} | {type(e).__name__}: {e}"}
-            raise e 
+            # raise e 
             print(f"ERROR: {str(e)}")
             try:
                 await miner.reset()

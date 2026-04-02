@@ -5,7 +5,7 @@ sat_3l_sm: &sat_3l_sm "sat-3l-sm"
 gpt2: &gpt2 "gpt2"
 opus_4_5: &opus_4_5 "bedrock/us.anthropic.claude-opus-4-5-20251101-v1:0"
 
-dataset: "OURS_TEST"
+dataset: "OURS"
 
 # llm models
 models:

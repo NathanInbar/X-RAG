@@ -209,3 +209,5 @@ __marimo__/
 
 # - - - Custom Rules
 secrets.env
+.DS_Store
+src/.venv
