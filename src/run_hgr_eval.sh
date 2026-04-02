@@ -3,14 +3,48 @@
 # config
 KEY="~/.ssh/karen-hgr-key.pem"
 EC2_USER="ec2-user"
-EC2_IP="YOUR_INSTANCE_IP"
-INSTANCE_ID="i-0abc123def456"
-SCRIPT="test.py"
-RESULTS_FILE="/home/ec2-user/results.json"
+INSTANCE_ID="i-0f07890683eae8a66"
+SCRIPT="test_bash_script.py"
+RESULTS_FILE="/home/ec2-user/X-RAG/src/results/test_bash.json"
 LOCAL_DEST="/Users/karenxu/Documents/School/Spring2026/DS/code/X-RAG/src/results"
 
+echo "Starting instance $INSTANCE_ID"
+aws ec2 start-instances --instance-ids "$INSTANCE_ID" --region ca-central-1
+
+echo "Fetching IP"
+EC2_IP=""
+i=0
+while :
+do 
+  DESC=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --region ca-central-1)
+  # echo "desc is $DESC"
+
+  STATE=$(echo "$DESC" | jq -r ".Reservations[0].Instances[0].State.Name")
+  echo "State is $STATE"
+    
+  if [ "$STATE" == "running" ]; then
+    EC2_IP=$(echo "$DESC" | jq -r ".Reservations[0].Instances[0].PublicIpAddress")
+    echo "IP is $EC2_IP"
+    break
+  else
+    echo "Retrying... ($i)"
+    i=$((i+1))
+    sleep 2
+  fi
+done
+
+j=0
+until ssh -i $KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP \
+  "cd ~/X-RAG/src && uv run python3 $SCRIPT"
+do
+  echo "Try ssh $EC2_USER@$EC2_IP ($j)"
+  j=$((j+1))
+  sleep 5
+done
+
 echo "Running script on EC2..."
-ssh -i $KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP "python ~/your_script.py"
+ssh -i $KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP \
+  "cd ~/X-RAG/src && uv run python3 $SCRIPT"
 
 if [ $? -ne 0 ]; then
   echo "Script failed, stopping instance."
@@ -29,5 +63,5 @@ fi
 echo "Results saved to $LOCAL_DEST"
 
 echo "Terminating instance..."
-aws ec2 terminate-instances --instance-ids $INSTANCE_ID --region ca-central-1
-echo "Instance terminated."
+aws ec2 stop-instances --instance-ids $INSTANCE_ID --region ca-central-1
+echo "Success, instance stopped."
