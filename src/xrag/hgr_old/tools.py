@@ -1,8 +1,12 @@
 import asyncio
-import litellm
+# import litellm
 import dspy
 import networkx as nx
 import numpy as np
+from xrag.dataset_processing.preprocess import embed_call_with_retry
+from xrag.utils import batched
+from tqdm import tqdm
+import math
 
 # This is prone to errors due to models not following the specification
 # We could try the means of this in HGR but I would rather not 
@@ -46,10 +50,17 @@ async def aggregate(
 
 	# print("Generate embeddings")
 	embed_knowledge_input = [k[0] for k in knowledge]
-	embed_entities_input = [e[2] for e in entities] # Embedding of name or desc? Let's try desc 
-	embeddings = litellm.embedding(model=embedding_model, input=embed_knowledge_input+embed_entities_input)
-	embed_knowledge = embeddings.data[:len(embed_knowledge_input)]
-	embed_entities = embeddings.data[len(embed_knowledge_input):]
+	embed_entities_input = [e[2] for e in entities] # Embedding of name or desc? Let's try desc
+
+	batches_to_embed = batched(embed_knowledge_input+embed_entities_input, 100)
+	total_batches = math.ceil(len(embed_knowledge_input+embed_entities_input) / 100)
+	embeddings = []
+	for batch in tqdm(batches_to_embed, total=total_batches):
+		resp = await embed_call_with_retry(to_embed=batch)
+		embeddings.extend(resp.data)
+	# embeddings = litellm.embedding(model=embedding_model, input=embed_knowledge_input+embed_entities_input)
+	embed_knowledge = embeddings[:len(embed_knowledge_input)]
+	embed_entities = embeddings[len(embed_knowledge_input):]
 
 	# print("Add entities")	
 	entities_indices = []
@@ -124,7 +135,8 @@ async def query(
 	# q_em_input = ", ".join(q_entities)
 	# That's not great so I will try this actually
 	q_em_input = query
-	q_em = np.array((await litellm.aembedding(model=embedding_model, input=q_em_input)).data[0].embedding)
+	q_em = np.array((await embed_call_with_retry(to_embed=q_em_input)).data[0].embedding)
+	# q_em = np.array((await litellm.aembedding(model=embedding_model, input=q_em_input)).data[0].embedding)
 
 	cosine = lambda a, B: np.abs(np.dot(B, a) / (np.linalg.norm(B, axis=1) * np.linalg.norm(a)))
 

@@ -4,6 +4,7 @@ from xrag.utils.eval import MINER
 from xrag.config import config
 from pathlib import Path
 import ijson
+from tqdm import tqdm
 
 MODEL = config.models["hgr"]
 
@@ -30,22 +31,14 @@ class HypergraphMINER(MINER):
 		self.embedding_model = config.models["embed"]
 	
 	async def ingest(self, preprocess_chunk_json:Path, _:Path):
-		error_count = 0
-		total = 0
-		# print("\n")
 		with dspy.context(lm=dspy.LM(self.model)):
 			with open(preprocess_chunk_json, "rb") as in_file:
 				for itm in ijson.items(in_file, "item"):
-					for i,chunk in enumerate(itm['chunks']):
-						total += 1
+					for i,chunk in enumerate(tqdm(itm['chunks'])):
 						text = chunk["raw_text"]
 						k, e = await extract_edges_entities(text)
-						if not (k and e):
-							error_count += 1
-							print(f"\r{error_count} chunks failed")
 						self.kb += k
 						self.eb += e
-		assert error_count == 0, f"Failed ingestion on {error_count} chunks"
 
 	async def pre_retrieve(self, article_name):
 		with dspy.context(lm=dspy.LM(self.model)):

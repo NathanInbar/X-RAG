@@ -44,7 +44,9 @@ done
 
 echo "Running script on EC2..."
 ssh -i $KEY -o StrictHostKeyChecking=no $EC2_USER@$EC2_IP \
-  "cd ~/X-RAG/src && uv run python3 $SCRIPT"
+  "cd ~/X-RAG/src && nohup uv run python3 $SCRIPT OURS_TEST" &
+
+wait
 
 if [ $? -ne 0 ]; then
   echo "Script failed, stopping instance."

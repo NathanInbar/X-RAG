@@ -188,7 +188,7 @@ async def evaluate(
     eval_itms: list[callable],
     concurrency: int = 3,
 ):
-    await mg_driver.init()
+    # await mg_driver.init()
     limiter = AsyncLimiter(concurrency)
     async def limited(f):
         async with limiter:
