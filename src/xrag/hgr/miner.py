@@ -1,9 +1,11 @@
-from xrag.hgr.tools import aggregate, extract_edges_entities, query
-import dspy
-from xrag.utils.eval import MINER
-from xrag.config import config
-from pathlib import Path
 import ijson
+import dspy
+from pathlib import Path
+
+from xrag.config import config
+from xrag.utils.eval import MINER
+from xrag.hgr.tools import aggregate, extract_all_edges_entities, query
+from xrag.paths import CACHE_DIR
 
 MODEL = config.models["hgr"]
 
@@ -27,29 +29,32 @@ class HypergraphMINER(MINER):
 		self.kh = kh
 		self.th = th
 		self.model = model
-		self.embedding_model = config.models["embed"]
+
+	def _graph_cache_path(self, article_name):
+		return CACHE_DIR / f"{article_name}_graph.json"
 	
 	async def ingest(self, preprocess_chunk_json:Path, _:Path):
-		with dspy.context(lm=dspy.LM(self.model)):
-			with open(preprocess_chunk_json, "rb") as in_file:
+		chunks = []
+		with open(preprocess_chunk_json, "rb") as in_file:
 				for itm in ijson.items(in_file, "item"):
-					for i,chunk in enumerate(itm['chunks']):
+					for chunk in itm['chunks']:
 						text = chunk["raw_text"]
-						k, e = await extract_edges_entities(text)
-						self.kb += k
-						self.eb += e
-	
-	async def pre_retrieve(self, article_name):
-		with dspy.context(lm=dspy.LM(self.model)):
-			self.hg = await aggregate(self.kb, self.eb, self.embedding_model)
+						chunks.append(text)
 
-	async def retrieve(self, query_text, preprocess_chunks_filepath:Path) -> str:
+		k, e = await extract_all_edges_entities(chunks)
+		assert k and e
+		self.kb = k
+		self.eb = e
+
+	async def pre_retrieve(self, article_name: str) -> None:
+		graph_cache_json = self._graph_cache_path(article_name)
+		self.hg = await aggregate(self.kb, self.eb, cache_path=graph_cache_json)
+
+	async def retrieve(self, query_text: str, _: Path) -> str:
 		assert not (self.hg is None)
-		with dspy.context(lm=dspy.LM(self.model)):
-			k = await query(query_text, self.hg, self.embedding_model, kv=self.kv, tv=self.tv, kh=self.kh, th=self.th)
-		return k
+		return (await query(query_text, self.hg, kv=self.kv, tv=self.tv, kh=self.kh, th=self.th))
 
-	async def reset(self):
+	async def reset(self) -> None:
 		self.kb = []
 		self.eb = []
 		self.hg = None

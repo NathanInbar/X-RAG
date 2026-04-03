@@ -15,7 +15,9 @@ dependencies = [
     "aiolimiter",
     "datasets==2.18.0",
     "semhash",
-    "inflect"
+    "inflect",
+    "ijson>=3.4.0",
+    "networkx>=3.6.1",
 ]
 
 [project.optional-dependencies]

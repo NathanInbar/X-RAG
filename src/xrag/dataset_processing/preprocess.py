@@ -321,7 +321,9 @@ def process_chunk_text(chunk_text:str) -> Chunk:
     }
     return raw_chunk
 
-async def embed_call_with_retry(to_embed):
+# access the list of Embedding objects with .data
+# for each item in the list of Embeddings, use item.embedding to get the vectors
+async def embed_call_with_retry(to_embed: list[str] | str) -> litellm.EmbeddingResponse:
     retry_delay = INITIAL_DELAY
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
@@ -329,11 +331,12 @@ async def embed_call_with_retry(to_embed):
                 resp = await litellm.aembedding(model=EMBED_MODEL, input=to_embed)
             return resp
         except Exception as e:
+            n_embeddings = len(to_embed) if isinstance(to_embed,list) else 1
             if attempt == MAX_ATTEMPTS:
-                error_message = f"Max retry attempts reached. Skipping {len(to_embed)} embeddings: {e}"
-                logger.error(error_message)
+                error_message = f"Max retry attempts reached. Skipping {n_embeddings} embeddings: {e}"
+                logger.error(error_message, to_embed)
                 raise RuntimeError(error_message)
-            logger.error(f"Embed attempt {attempt} failed for {len(to_embed)} descriptions. Retrying in {retry_delay}s: {e}")
+            logger.error(f"Embed attempt {attempt} failed ({n_embeddings} items). Retrying in {retry_delay}s: {e}")
             await asyncio.sleep(retry_delay)
             retry_delay *= 2
             retry_delay += random.uniform(0, 1)

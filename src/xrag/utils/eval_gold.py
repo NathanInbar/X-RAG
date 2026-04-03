@@ -1,3 +1,4 @@
+import asyncio
 from xrag.paths import DATASETS_DIR, RESULTS_DIR, CACHE_DIR
 import json
 import time
@@ -209,6 +210,21 @@ async def miner_evaluate_with_gold_answers(name: str, miner: "MINER", dataset: s
                     q_st = time.time()
                     context:str = await miner.retrieve(query, preprocessed_chunks)
                     q_en = time.time()
+
+                    # If no context is returned, the subsequent calculations will fail
+                    if context.strip() == "":
+                        query_results.append({
+                            "query": query,
+                            "context": context,
+                            "duration": q_en - q_st,
+                            "evidence_recall": -0.0,
+                            "evidence_precision": -0.0,
+                            "evidence_f1": -0.0,
+                            "mean_gold_sim": -0.0,
+                            "min_gold_sim": -0.0,
+                            "is_constructible": False,
+                        })
+                        continue
                 
                     ### INSERT QUERY EVALUATION ALGORITHM HERE:
                     ### (NOTE:) TO TOKENIZE: CALL Tokenizer.encode(my_string)
@@ -304,7 +320,11 @@ async def evaluate(
             return await f
 
     print(f"Running {len(eval_itms)} evaluations with concurrency {concurrency}")
-    [await f for f in eval_itms]
+    if concurrency > 1:
+        jobs = [limited(j) for j in eval_itms]
+        await asyncio.gather(*jobs)
+    else:
+        [await f for f in eval_itms]
     print("Done!")
 
     show_results()
