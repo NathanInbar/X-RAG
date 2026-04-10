@@ -164,10 +164,21 @@ async def _embed_texts(texts: list[str]) -> list[np.ndarray]:
     all_embeddings: list[np.ndarray] = []
     for i in range(0, len(texts), EMBED_BATCH_LIMIT):
         batch = texts[i : i + EMBED_BATCH_LIMIT]
-        resp = await litellm.aembedding(model=EMBED_MODEL, input=batch)
-        # sort by index to guarantee input-order alignment
-        sorted_data = sorted(resp.data, key=lambda d: d["index"])
-        all_embeddings.extend(np.array(d["embedding"]) for d in sorted_data)
+        delay = INITIAL_DELAY
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                resp = await litellm.aembedding(model=EMBED_MODEL, input=batch)
+                # sort by index to guarantee input-order alignment
+                sorted_data = sorted(resp.data, key=lambda d: d["index"])
+                all_embeddings.extend(np.array(d["embedding"]) for d in sorted_data)
+                break
+            except Exception as e:
+                if attempt < MAX_ATTEMPTS:
+                    logger.warning(f"[embed] attempt {attempt} failed: {e}, retrying in {delay}s")
+                    await asyncio.sleep(delay)
+                    delay *= 2
+                else:
+                    raise
     return all_embeddings
 
 
@@ -323,7 +334,7 @@ async def run_extraction(
 ) -> list[dict]:
     """Run triplet extraction for a single model across all chunks."""
     sem = asyncio.Semaphore(MAX_PARALLEL)
-    lm = dspy.LM(model_id)
+    lm = dspy.LM(model_id, max_tokens=16000)
     predict = dspy.Predict(_ExtractTriples)
 
     async def _extract_one(chunk: dict) -> dict:
@@ -447,8 +458,8 @@ async def judge_extractions(
                             f"chunk {result['chunk_id'][:8]}: {e}"
                         )
                         result.update(
-                            judge_faithfulness=0, judge_completeness=0,
-                            judge_granularity=0, judge_well_formedness=0,
+                            judge_faithfulness=None, judge_completeness=None,
+                            judge_granularity=None, judge_well_formedness=None,
                             judge_rationale=f"Judge error: {e}",
                         )
 
@@ -493,9 +504,7 @@ async def compute_quant_metrics(
             result.update(
                 topical_alignment=round(alignment, 4),
                 topical_coverage=round(coverage, 4),
-                topical_coverage_per_triple=round(
-                    coverage / len(triples), 4
-                ) if triples else 0.0,
+                topical_coverage_per_triple=round(coverage / len(triples), 4),
                 keyword_overlap=round(calc_entity_recall(triples, text), 4),
                 redundancy_ratio=round(calc_redundancy_ratio(triples), 4),
                 mean_field_lengths=calc_mean_field_lengths(triples),
@@ -542,7 +551,7 @@ def aggregate(results: list[dict], common_chunk_ids: set[str] | None = None) -> 
         quality_set = [r for r in results if r.get("has_triples")]
 
     def _vals(key: str) -> list[float]:
-        return [r[key] for r in quality_set if key in r]
+        return [r[key] for r in quality_set if key in r and r[key] is not None]
 
     parse_count = sum(1 for r in results if r["parse_success"])
     triples_count = sum(1 for r in results if r.get("has_triples"))
@@ -570,6 +579,11 @@ def aggregate(results: list[dict], common_chunk_ids: set[str] | None = None) -> 
         "mean_judge_completeness": _safe_mean(_vals("judge_completeness")),
         "mean_judge_granularity": _safe_mean(_vals("judge_granularity")),
         "mean_judge_well_formedness": _safe_mean(_vals("judge_well_formedness")),
+        # chunk length covariate (for analysing quality vs chunk size)
+        "mean_input_tokens": _safe_mean([r["input_tokens"] for r in quality_set]),
+        "std_input_tokens": _safe_stdev([r["input_tokens"] for r in quality_set]),
+        "min_input_tokens": min((r["input_tokens"] for r in quality_set), default=0),
+        "max_input_tokens": max((r["input_tokens"] for r in quality_set), default=0),
         # stdev for key metrics
         "std_topical_alignment": _safe_stdev(_vals("topical_alignment")),
         "std_topical_coverage": _safe_stdev(_vals("topical_coverage")),
