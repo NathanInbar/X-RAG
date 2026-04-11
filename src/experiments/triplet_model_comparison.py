@@ -31,15 +31,13 @@ import litellm
 import numpy as np
 import yake
 from prettytable import PrettyTable
-from tokenizers import Tokenizer
 
 from xrag.config import config
 from xrag.dataset_processing.preprocess import (
-    TextSegmenter,
     _ExtractTriples,
+    process_dataset_file,
 )
-from xrag.paths import DATASETS_DIR, SRC
-from xrag.utils import stable_id_hex
+from xrag.paths import CACHE_DIR, DATASETS_DIR, SRC
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -54,8 +52,6 @@ CANDIDATE_MODELS: dict[str, str] = {
 
 JUDGE_MODEL = "bedrock/us.anthropic.claude-opus-4-5-20251101-v1:0"
 EMBED_MODEL = config.models["embed"]           # Titan v2
-TOKENIZER_MODEL = config.models["tokenizer"]   # gpt2
-SEGMENTER_MODEL = config.models["segmenter"]   # SaT
 
 SAMPLE_SIZE = 10
 SEED = 42
@@ -76,8 +72,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(levelname)s | %(name)s | %(message)s",
 )
-
-_tokenizer = Tokenizer.from_pretrained(TOKENIZER_MODEL)
 
 # shared YAKE extractor (initialization loads stopwords, no need to repeat)
 _yake_extractor = yake.KeywordExtractor(lan="en", n=2, top=30, dedupLim=0.7)
@@ -291,8 +285,8 @@ def calc_mean_field_lengths(triples: list[dict]) -> dict[str, float]:
 
 # ── data loading ─────────────────────────────────────────────────────────────
 
-def load_sample_chunks() -> list[dict]:
-    """Sample documents from OURS and segment into chunks."""
+async def load_sample_chunks() -> list[dict]:
+    """Load chunks from preprocess cache, generating cache for any missing documents."""
     dataset_dir = DATASETS_DIR / DATASET
     all_files = sorted(dataset_dir.glob("*.json"))
     if not all_files:
@@ -301,29 +295,37 @@ def load_sample_chunks() -> list[dict]:
     rng = random.Random(SEED)
     sampled = rng.sample(all_files, min(SAMPLE_SIZE, len(all_files)))
 
-    TextSegmenter.configure(model=SEGMENTER_MODEL)
+    # ensure cache exists for every sampled document
+    for f in sampled:
+        cache_file = CACHE_DIR / f"{f.stem}__chunks.json"
+        if not cache_file.is_file():
+            logger.info(f"Cache miss for {f.name} — running preprocess (this may take a while)...")
+            try:
+                await process_dataset_file(f)
+            except Exception as e:
+                logger.error(f"Failed to preprocess {f.name}: {e} — skipping document")
+                continue
 
+    # load chunks from cache
     chunks: list[dict] = []
     for f in sampled:
-        with open(f) as fp:
-            data = json.load(fp)
-        if "essay" not in data:
-            logger.warning(f"Skipping {f.name}: no 'essay' key")
+        cache_file = CACHE_DIR / f"{f.stem}__chunks.json"
+        if not cache_file.is_file():
             continue
-        segments = TextSegmenter.create_segments(data["essay"])
-        for seg in segments:
-            seg = seg.strip()
-            enc = _tokenizer.encode(seg)
-            if len(enc) < MIN_CHUNK_TOKENS:
-                continue
-            chunks.append({
-                "id": stable_id_hex(seg),
-                "raw_text": seg,
-                "approx_n_tokens": len(enc),
-                "source_file": f.name,
-            })
+        with open(cache_file) as fp:
+            doc_entries = json.load(fp)
+        for doc in doc_entries:
+            for chunk in doc["chunks"]:
+                if chunk["approx_n_tokens"] < MIN_CHUNK_TOKENS:
+                    continue
+                chunks.append({
+                    "id": chunk["id"],
+                    "raw_text": chunk["raw_text"],
+                    "approx_n_tokens": chunk["approx_n_tokens"],
+                    "source_file": f.name,
+                })
 
-    logger.info(f"Loaded {len(chunks)} chunks from {len(sampled)} documents")
+    logger.info(f"Loaded {len(chunks)} chunks from {len(sampled)} documents (from cache)")
     return chunks
 
 
@@ -641,7 +643,7 @@ def print_summary(all_results: dict) -> None:
 
 async def main() -> None:
     logger.info(f"Loading sample chunks from {DATASET} (n={SAMPLE_SIZE}, seed={SEED})")
-    chunks = load_sample_chunks()
+    chunks = await load_sample_chunks()
     if not chunks:
         logger.error("No chunks loaded — aborting")
         return
@@ -664,11 +666,53 @@ async def main() -> None:
     output: dict[str, dict] = {"metadata": metadata}
     OUTPUT_DIR.mkdir(exist_ok=True)
 
+    tmp_file = OUTPUT_FILE.with_suffix(OUTPUT_FILE.suffix + ".tmp")
+
     def _save() -> None:
-        with open(OUTPUT_FILE, "w") as fp:
+        with open(tmp_file, "w") as fp:
             json.dump(output, fp, indent=2, ensure_ascii=False, default=str)
+            fp.write("\n")
+        tmp_file.replace(OUTPUT_FILE)
+
+    # ── Resume: load existing results ──────────────────────────────────
+    current_chunk_ids = {c["id"] for c in chunks}
+    if OUTPUT_FILE.is_file():
+        try:
+            with open(OUTPUT_FILE) as fp:
+                prev = json.load(fp)
+            if isinstance(prev, dict):
+                for model_name in CANDIDATE_MODELS:
+                    entry = prev.get(model_name)
+                    if not (
+                        isinstance(entry, dict)
+                        and "per_chunk" in entry
+                        and "error" not in entry
+                    ):
+                        continue
+                    # validate chunk IDs match current set
+                    resumed_ids = {r["chunk_id"] for r in entry["per_chunk"]}
+                    if resumed_ids != current_chunk_ids:
+                        logger.warning(
+                            f"Chunk set mismatch for {model_name} — will re-run "
+                            f"(prev={len(resumed_ids)}, curr={len(current_chunk_ids)})"
+                        )
+                        continue
+                    output[model_name] = entry
+                    raw_results[model_name] = entry["per_chunk"]
+                    logger.info(
+                        f"Resumed {model_name} from previous run "
+                        f"({len(entry['per_chunk'])} chunks)"
+                    )
+        except (json.JSONDecodeError, KeyError) as e:
+            logger.warning(f"Could not load previous results for resume: {e}")
+
+    _save()
 
     for model_name, model_id in CANDIDATE_MODELS.items():
+        if model_name in raw_results:
+            logger.info(f"SKIP (cached): {model_name}")
+            continue
+
         logger.info(f"{'='*60}")
         logger.info(f"Extracting with {model_name} ({model_id})")
         logger.info(f"{'='*60}")
