@@ -334,7 +334,9 @@ async def run_extraction(
 ) -> list[dict]:
     """Run triplet extraction for a single model across all chunks."""
     sem = asyncio.Semaphore(MAX_PARALLEL)
-    lm = dspy.LM(model_id, max_tokens=16000)
+    model_info = litellm.get_model_info(model_id)
+    model_max = model_info.get("max_output_tokens", 4000)
+    lm = dspy.LM(model_id, max_tokens=min(16000, model_max))
     predict = dspy.Predict(_ExtractTriples)
 
     async def _extract_one(chunk: dict) -> dict:
