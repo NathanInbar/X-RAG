@@ -27,6 +27,7 @@ import time
 from statistics import mean, stdev
 
 import dspy
+from dspy.adapters.json_adapter import JSONAdapter
 import litellm
 import numpy as np
 import yake
@@ -358,6 +359,11 @@ async def run_extraction(
                     with dspy.context(lm=lm):
                         pred = await predict.acall(source_text=chunk["raw_text"])
                     raw_output = getattr(pred, "triples_json", "") or "[]"
+                    raw_output = raw_output.strip()
+                    if raw_output.startswith("```"):
+                        raw_output = re.sub(r"^```\w*\n?", "", raw_output)
+                        raw_output = re.sub(r"\n?```\s*$", "", raw_output)
+                        raw_output = raw_output.strip()
                     data = json.loads(raw_output)
                     if not isinstance(data, list):
                         raise ValueError("not a list")
@@ -642,6 +648,10 @@ def print_summary(all_results: dict) -> None:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 async def main() -> None:
+    # disable tool/function calling — Nova models don't support toolChoice.tool
+    # and JSON mode works consistently across all Bedrock models
+    dspy.configure(adapter=JSONAdapter(use_native_function_calling=False))
+
     logger.info(f"Loading sample chunks from {DATASET} (n={SAMPLE_SIZE}, seed={SEED})")
     chunks = await load_sample_chunks()
     if not chunks:
@@ -689,9 +699,9 @@ async def main() -> None:
                         and "error" not in entry
                     ):
                         continue
-                    # validate chunk IDs match current set
+                    # validate chunk IDs and count match current set
                     resumed_ids = {r["chunk_id"] for r in entry["per_chunk"]}
-                    if resumed_ids != current_chunk_ids:
+                    if resumed_ids != current_chunk_ids or len(entry["per_chunk"]) != len(chunks):
                         logger.warning(
                             f"Chunk set mismatch for {model_name} — will re-run "
                             f"(prev={len(resumed_ids)}, curr={len(current_chunk_ids)})"
