@@ -27,7 +27,7 @@ import time
 from statistics import mean, stdev
 
 import dspy
-from dspy.adapters.json_adapter import JSONAdapter
+from dspy.adapters.chat_adapter import ChatAdapter
 import litellm
 import numpy as np
 import yake
@@ -648,9 +648,9 @@ def print_summary(all_results: dict) -> None:
 # ── main ─────────────────────────────────────────────────────────────────────
 
 async def main() -> None:
-    # disable tool/function calling — Nova models don't support toolChoice.tool
-    # and JSON mode works consistently across all Bedrock models
-    dspy.configure(adapter=JSONAdapter(use_native_function_calling=False))
+    # use ChatAdapter (text-based parsing) — Nova models don't support tool calling
+    # or JSON response mode, and ChatAdapter works consistently across all models
+    dspy.configure(adapter=ChatAdapter())
 
     logger.info(f"Loading sample chunks from {DATASET} (n={SAMPLE_SIZE}, seed={SEED})")
     chunks = await load_sample_chunks()
