@@ -67,7 +67,7 @@ Each needle contains:
 
 ### 2. Needle Injection
 
-Needles are injected as natural sentences at evenly-spaced positions throughout the text:
+Needles are injected as natural sentences at random positions throughout the text:
 
 ```python
 def inject_needles(chunk_text: str, needles: list[dict]) -> str:

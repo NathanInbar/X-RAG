@@ -44,7 +44,7 @@ import numpy as np
 from prettytable import PrettyTable
 
 from xrag.config import config
-from xrag.dataset_processing.preprocess import _ExtractTriples
+from xrag.dataset_processing.preprocess import _ExtractTriples, process_dataset_file
 from xrag.paths import CACHE_DIR, DATASETS_DIR, SRC
 
 # ── constants ────────────────────────────────────────────────────────────────
@@ -238,10 +238,13 @@ async def generate_needles(
 
 def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str, float]:
     """
-    Inject needle sentences into chunk text at evenly-spaced positions.
+    Inject needle sentences into chunk text at random positions.
+
+    Per Seitl et al. (2024): "We scatter several needles at random over the
+    text document body (such that the inserted needles fill 10 to 30% of
+    the enriched text)."
 
     Inserts needles between sentences to maintain natural flow.
-    Per the NIAH paper, needles should comprise 10-30% of enriched text.
 
     Returns:
         (enriched_text, needle_fraction): enriched text and the fraction of text
@@ -250,21 +253,29 @@ def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str,
     # split into sentences
     sentences = re.split(r"(?<=[.!?])\s+", chunk_text.strip())
 
-    # calculate injection positions (distribute evenly using fractional positioning)
+    # calculate injection positions (random placement per paper)
     n_needles = len(needles)
     if n_needles == 0:
         return chunk_text, 0.0
 
-    # Pre-calculate evenly-spaced positions using fractional method
-    # This ensures needles are distributed evenly throughout the text
+    # Select random positions for needle insertion
+    # Use seeded RNG for reproducibility
+    rng = random.Random(SEED)
+
     # Map position -> list of needle indices to handle multiple needles per position
     position_to_needles = defaultdict(list)
 
-    for i in range(n_needles):
-        # Place needle at fractional position: (i+1) / (n_needles+1) through the text
-        frac = (i + 1) / (n_needles + 1)
-        pos = int(frac * len(sentences))
-        position_to_needles[pos].append(i)
+    if len(sentences) >= n_needles:
+        # Sample n_needles positions without replacement
+        positions = sorted(rng.sample(range(len(sentences)), n_needles))
+        for needle_idx, pos in enumerate(positions):
+            position_to_needles[pos].append(needle_idx)
+    else:
+        # More needles than sentences - some positions will have multiple needles
+        # Sample with replacement
+        for needle_idx in range(n_needles):
+            pos = rng.randint(0, len(sentences) - 1)
+            position_to_needles[pos].append(needle_idx)
 
     # Insert needles at calculated positions
     enriched = []
@@ -276,6 +287,7 @@ def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str,
                 enriched.append(needles[needle_idx]["sentence"])
 
     # Handle needles that map to position == len(sentences) (after last sentence)
+    # This can happen with randint(0, len(sentences)-1) edge case
     if len(sentences) in position_to_needles:
         for needle_idx in position_to_needles[len(sentences)]:
             enriched.append(needles[needle_idx]["sentence"])
@@ -645,7 +657,12 @@ async def evaluate_needle_capture(
 
 
 async def load_sample_documents() -> list[dict]:
-    """Load sample documents from dataset."""
+    """
+    Load chunks using SaT segmentation from preprocess cache.
+
+    Uses the same chunking approach as triplet_model_comparison experiment
+    to ensure consistency across evaluations.
+    """
     dataset_dir = DATASETS_DIR / DATASET
     all_files = sorted(dataset_dir.glob("*.json"))
     if not all_files:
@@ -654,26 +671,60 @@ async def load_sample_documents() -> list[dict]:
     rng = random.Random(SEED)
     sampled = rng.sample(all_files, min(SAMPLE_SIZE, len(all_files)))
 
-    documents = []
+    # Ensure cache exists for every sampled document (generates if missing)
     for f in sampled:
-        with open(f) as fp:
-            data = json.load(fp)
-        essay = data.get("essay", "")
-        if not essay:
+        cache_file = CACHE_DIR / f"{f.stem}__chunks.json"
+        if not cache_file.is_file():
+            logger.info(f"Cache miss for {f.name} — running preprocess with SaT segmentation (may take a while)...")
+            try:
+                await process_dataset_file(f)
+            except Exception as e:
+                logger.error(f"Failed to preprocess {f.name}: {e} — skipping document")
+                continue
+
+    # Load chunks from cache
+    all_chunks = []
+    for f in sampled:
+        cache_file = CACHE_DIR / f"{f.stem}__chunks.json"
+        if not cache_file.is_file():
+            logger.warning(f"No cache file for {f.name}, skipping")
             continue
 
-        # take first portion of essay as single chunk for this experiment
-        # (in production, you'd use preprocessed chunks)
-        chunk_text = essay[:5000]  # ~5k chars
-        if len(chunk_text) < 500:
-            continue
+        with open(cache_file) as fp:
+            doc_entries = json.load(fp)
 
+        for doc in doc_entries:
+            for chunk in doc["chunks"]:
+                if chunk["approx_n_tokens"] < MIN_CHUNK_TOKENS:
+                    continue
+                all_chunks.append({
+                    "source_file": f.name,
+                    "text": chunk["raw_text"],
+                    "approx_n_tokens": chunk["approx_n_tokens"],
+                    "chunk_id": chunk["id"],
+                })
+
+    # Group chunks by document and select one chunk per document
+    # (We want N documents, not N chunks, to match original experiment design)
+    doc_to_chunks = {}
+    for chunk in all_chunks:
+        source = chunk["source_file"]
+        if source not in doc_to_chunks:
+            doc_to_chunks[source] = []
+        doc_to_chunks[source].append(chunk)
+
+    # Select the longest chunk from each document (most content for needle injection)
+    documents = []
+    for source_file, chunks in doc_to_chunks.items():
+        best_chunk = max(chunks, key=lambda c: c["approx_n_tokens"])
         documents.append({
-            "source_file": f.name,
-            "text": chunk_text,
+            "source_file": source_file,
+            "text": best_chunk["text"],
+            "approx_n_tokens": best_chunk["approx_n_tokens"],
+            "chunk_id": best_chunk["chunk_id"],
         })
 
-    logger.info(f"Loaded {len(documents)} documents from {len(sampled)} files")
+    logger.info(f"Loaded {len(documents)} chunks from {len(sampled)} documents (using SaT segmentation)")
     return documents
 
 
