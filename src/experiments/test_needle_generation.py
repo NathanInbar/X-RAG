@@ -80,22 +80,22 @@ async def main():
     print("=" * 80)
     print("INJECTING NEEDLES INTO TEXT...")
     print("=" * 80)
-    enriched = inject_needles(chunk_text, needles)
+    enriched, needle_fraction = inject_needles(chunk_text, needles)
 
     # highlight injected sentences
     print("ENRICHED TEXT (needle sentences in [NEEDLE]):\n")
+    enriched_display = enriched
     for needle in needles:
-        enriched = enriched.replace(
+        enriched_display = enriched_display.replace(
             needle["sentence"], f"[NEEDLE] {needle['sentence']} [/NEEDLE]"
         )
 
-    print(enriched)
+    print(enriched_display)
     print()
 
     # stats
     original_len = len(chunk_text)
     enriched_len = len(enriched)
-    needle_fraction = (enriched_len - original_len) / enriched_len
     print("=" * 80)
     print("STATISTICS")
     print("=" * 80)

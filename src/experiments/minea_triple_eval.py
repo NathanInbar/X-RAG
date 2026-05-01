@@ -27,6 +27,7 @@ Usage:
 """
 
 import asyncio
+from collections import defaultdict
 import json
 import logging
 import random
@@ -185,21 +186,33 @@ async def generate_needles(
             for item in data:
                 if not isinstance(item, dict):
                     continue
-                s = (item.get("subject") or "").strip()
-                p = (item.get("predicate") or "").strip()
-                o = (item.get("object") or "").strip()
-                sent = (item.get("sentence") or "").strip()
+                # Ensure we have string values before calling .strip()
+                s_raw = item.get("subject") or ""
+                p_raw = item.get("predicate") or ""
+                o_raw = item.get("object") or ""
+                sent_raw = item.get("sentence") or ""
+                if not all(isinstance(v, str) for v in [s_raw, p_raw, o_raw, sent_raw]):
+                    continue
+                s = s_raw.strip()
+                p = p_raw.strip()
+                o = o_raw.strip()
+                sent = sent_raw.strip()
                 kws = item.get("keywords", [])
                 if not (s and p and o and sent):
                     continue
                 if not isinstance(kws, list):
                     kws = []
+                # Ensure keywords are strings before calling .strip()
+                validated_kws = []
+                for k in kws:
+                    if isinstance(k, str) and k.strip():
+                        validated_kws.append(k.strip())
                 needles.append({
                     "subject": s,
                     "predicate": p,
                     "object": o,
                     "sentence": sent,
-                    "keywords": [k.strip() for k in kws if k],
+                    "keywords": validated_kws,
                 })
 
             if len(needles) < n_needles:
@@ -244,21 +257,23 @@ def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str,
 
     # Pre-calculate evenly-spaced positions using fractional method
     # This ensures needles are distributed evenly throughout the text
-    positions = []
+    # Map position -> list of needle indices to handle multiple needles per position
+    position_to_needles = defaultdict(list)
+
     for i in range(n_needles):
         # Place needle at fractional position: (i+1) / (n_needles+1) through the text
         frac = (i + 1) / (n_needles + 1)
         pos = int(frac * len(sentences))
-        positions.append(pos)
+        position_to_needles[pos].append(i)
 
     # Insert needles at calculated positions
     enriched = []
-    needle_idx = 0
     for i, sent in enumerate(sentences):
         enriched.append(sent)
-        if needle_idx < n_needles and i == positions[needle_idx]:
-            enriched.append(needles[needle_idx]["sentence"])
-            needle_idx += 1
+        # Insert all needles mapped to this position
+        if i in position_to_needles:
+            for needle_idx in position_to_needles[i]:
+                enriched.append(needles[needle_idx]["sentence"])
 
     enriched_text = " ".join(enriched)
 
@@ -319,9 +334,15 @@ async def run_extraction_on_enriched_chunk(
             for item in data:
                 if not isinstance(item, dict):
                     continue
-                s = (item.get("subject") or "").strip()
-                p = (item.get("predicate") or "").strip()
-                o = (item.get("object") or "").strip()
+                # Ensure we have string values before calling .strip()
+                s_raw = item.get("subject") or ""
+                p_raw = item.get("predicate") or ""
+                o_raw = item.get("object") or ""
+                if not isinstance(s_raw, str) or not isinstance(p_raw, str) or not isinstance(o_raw, str):
+                    continue
+                s = s_raw.strip()
+                p = p_raw.strip()
+                o = o_raw.strip()
                 if s and p and o:
                     triples.append({"s": s, "p": p, "o": o})
 
