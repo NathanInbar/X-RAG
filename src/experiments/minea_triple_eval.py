@@ -231,9 +231,9 @@ async def generate_needles(
                 delay *= 2
             else:
                 logger.error(f"[needle-gen] all attempts failed: {e}")
-                raise
+                return []  # Return empty list instead of raising
 
-    return []
+    return []  # Should never reach here, but defensive programming
 
 
 def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str, float]:
@@ -275,6 +275,11 @@ def inject_needles(chunk_text: str, needles: list[dict[str, Any]]) -> tuple[str,
             for needle_idx in position_to_needles[i]:
                 enriched.append(needles[needle_idx]["sentence"])
 
+    # Handle needles that map to position == len(sentences) (after last sentence)
+    if len(sentences) in position_to_needles:
+        for needle_idx in position_to_needles[len(sentences)]:
+            enriched.append(needles[needle_idx]["sentence"])
+
     enriched_text = " ".join(enriched)
 
     # Calculate needle fraction for NIAH compliance validation
@@ -301,8 +306,22 @@ async def run_extraction_on_enriched_chunk(
     enriched_text: str,
 ) -> dict[str, Any]:
     """Run triple extraction on a needle-enriched chunk."""
-    model_info = litellm.get_model_info(model_id)
-    model_max = model_info.get("max_output_tokens", 4000)
+    try:
+        model_info = litellm.get_model_info(model_id)
+        model_max = model_info.get("max_output_tokens", 4000)
+    except Exception as e:
+        logger.error(f"[{model_name}] invalid model ID {model_id}: {e}")
+        return {
+            "model_name": model_name,
+            "model_id": model_id,
+            "triple_count": 0,
+            "triples": [],
+            "parse_success": False,
+            "attempts": 0,
+            "elapsed_seconds": 0.0,
+            "error": f"Invalid model ID: {e}",
+        }
+
     lm = dspy.LM(model_id, max_tokens=min(16000, model_max))
     predict = dspy.Predict(_ExtractTriples)
 
@@ -360,7 +379,7 @@ async def run_extraction_on_enriched_chunk(
                 logger.error(f"[{model_name}] all attempts failed: {e}")
 
     elapsed = time.monotonic() - t0
-    return {
+    result = {
         "model_name": model_name,
         "model_id": model_id,
         "triple_count": len(triples),
@@ -369,6 +388,12 @@ async def run_extraction_on_enriched_chunk(
         "attempts": attempts_used,
         "elapsed_seconds": round(elapsed, 3),
     }
+
+    # Add error indicator if extraction failed
+    if not parse_success:
+        result["error"] = "Extraction failed after all retry attempts"
+
+    return result
 
 
 # ── needle identification ────────────────────────────────────────────────────
@@ -482,6 +507,10 @@ async def semantic_match(
 
         needle_emb = embeddings[0]
         triple_embs = embeddings[1:]
+
+        if not triple_embs:
+            logger.warning("[semantic_match] no triple embeddings to compare")
+            return False
 
         max_sim = max(_cosine_sim(needle_emb, te) for te in triple_embs)
         return max_sim >= threshold
@@ -679,6 +708,13 @@ async def run_experiment() -> None:
             doc_needles.append([])
 
     # inject needles into documents
+    if len(documents) != len(doc_needles):
+        logger.error(
+            f"Length mismatch: {len(documents)} documents != {len(doc_needles)} needle lists. "
+            "Some needle generations may have failed."
+        )
+        # This should not happen since we append [] on exception, but check defensively
+
     enriched_docs = []
     for doc, needles in zip(documents, doc_needles):
         enriched_text, needle_frac = inject_needles(doc["text"], needles)
