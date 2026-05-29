@@ -135,6 +135,7 @@ def inject_needles(
     max_frac: float,
     niah_epsilon: float,
     seed: int,
+    force_n_to_inject: int | None = None,
 ) -> tuple[str, float, int]:
     """
     Inject needle sentences into chunk text at random positions.
@@ -155,6 +156,10 @@ def inject_needles(
         max_frac: Maximum needle fraction (default 0.3 = 30%)
         niah_epsilon: Tolerance for boundary checks
         seed: Random seed for reproducibility
+        force_n_to_inject: If provided, skip the NIAH budgeting calculation
+            and inject exactly this many needles. Used by paired-injection
+            workflows that need flat and split renderings to inject the
+            identical needle indices at identical positions.
 
     Returns:
         (enriched_text, needle_fraction, n_injected): enriched text, actual fraction,
@@ -194,7 +199,12 @@ def inject_needles(
     max_n = min(max_n, n_available)
 
     # Check if constraint is satisfiable
-    if max_n < min_n:
+    if force_n_to_inject is not None:
+        # Paired-injection mode: caller has already chosen n_to_inject from
+        # the longer rendering, and is asking us to use exactly that count
+        # so flat and split copies stay positionally identical.
+        n_to_inject = min(force_n_to_inject, n_available)
+    elif max_n < min_n:
         # Cannot satisfy 10-30% range with available needles
         # Inject all available and accept the constraint violation
         n_to_inject = n_available

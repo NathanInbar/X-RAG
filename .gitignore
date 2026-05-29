@@ -209,3 +209,4 @@ __marimo__/
 
 # - - - Custom Rules
 secrets.env
+src/preprocess_cache/
